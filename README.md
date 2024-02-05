@@ -1,2 +1,2 @@
-# brain-age-1dcnn
-A lightweight 1D-CNN for brain age prediction
+# Master Thesis: Training + Evaluating a Lightweight 1D-CNN for Brain Age Prediction
+
