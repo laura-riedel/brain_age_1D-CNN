@@ -1,0 +1,18 @@
+# CREATE OVERVIEWS: which networks do the parcellations belong to?
+# import packages
+import pandas as pd
+
+# prepare data paths
+ukbb_dir = '/ritter/share/data/UKBB/ukb_data/bids/'
+schaefer_data_dir = '../../data/schaefer/'
+
+# define existing variants
+variants = ['7n100p','7n200p','7n500p','7n700p','7n1000p',
+            '17n100p','17n200p','17n500p','17n700p','17n1000p']
+
+# create separate overviews for each network/parcellation combination
+for variant in variants:
+    ts_path = ukbb_dir+'sub-1000014/ses-2/func/sub-1000014_ses-2_task-rest_Schaefer'+variant+'.csv.gz'
+    ts_df = pd.read_csv(ts_path)
+    # save
+    ts_df['label_name'].to_csv(schaefer_data_dir+'label_names_'+variant+'.csv', header=False, index=False)
