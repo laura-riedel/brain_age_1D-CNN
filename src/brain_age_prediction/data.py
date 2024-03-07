@@ -197,7 +197,7 @@ class UKBB_Schaefer_ts(Dataset):
         ts_path = self.data_path+'bids/sub-'+str(sub_id)+'/ses-2/func/sub-'+str(sub_id)+'_ses-2_task-rest_Schaefer'+self.schaefer_variant+'.csv.gz'
         
         # load + standardise timeseries
-        # don't include the first column that names the networks/parcellations ############# CHECK HOW MANY TIME POINTS
+        # don't include the first column that names the networks/parcellations 
         timeseries = np.loadtxt(ts_path, skiprows=1, usecols=tuple([i for i in range(1,491)]), delimiter=',') 
         # standardise each component's timeseries
         timeseries = zscore(timeseries, axis=1)
@@ -219,6 +219,7 @@ class UKBB_Schaefer_ts(Dataset):
             timeseries = torch.from_numpy(timeseries)
             model_input = timeseries.float()
             label = torch.tensor(label)
+            label = label.float()
         
         return model_input, label, sub_id        
 
