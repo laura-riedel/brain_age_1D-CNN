@@ -20,8 +20,9 @@ from brain_age_prediction import models
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+##################################################################################
 ### SAVING THINGS
-def save_data_info(path, datamodule):
+def save_data_info(path, datamodule, only_indices=False):
     """
     Creates a new directory "data_info" and saves the loaded overview of used datapoints
     (participant ID, age, file location) and the indices used for the train, validation,
@@ -29,8 +30,9 @@ def save_data_info(path, datamodule):
     """
     # create data_info directory
     os.makedirs(path+'data_info', exist_ok=True)
-    # save overview dataframe as csv
-    datamodule.data.labels.to_csv(path+'data_info/overview.csv', index=False)
+    if not only_indices:
+        # save overview dataframe as csv additional to indices
+        datamodule.data.labels.to_csv(path+'data_info/overview.csv', index=False)
     # save train/val/test indices as integers ('%i') in csv
     np.savetxt(path+'data_info/train_idx.csv', datamodule.train_idx, fmt='%i')
     np.savetxt(path+'data_info/val_idx.csv', datamodule.val_idx, fmt='%i')
@@ -126,12 +128,6 @@ def checkpoint_init(save_dir):
     checkpoint = ModelCheckpoint(dirpath=save_dir+'Checkpoint/',
                                  filename='models-{epoch:02d}-{val_loss:.2f}',
                                  monitor='val_loss',
-                                 save_top_k=1,
-                                 mode='min')
-    return checkpoint
-
-def wandb_checkpoint_init():
-    checkpoint = ModelCheckpoint(monitor='val_loss',
                                  save_top_k=1,
                                  mode='min')
     return checkpoint
