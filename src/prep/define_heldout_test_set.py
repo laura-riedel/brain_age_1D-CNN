@@ -34,6 +34,7 @@ schaefer_exists_df = pd.read_csv(schaefer_data_dir+'schaefer_exists.csv')
 # limit to cases of existing, non-empty files
 schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['schaefer_exists'] == False].index, inplace=True)
 schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['is_empty'] == True].index, inplace=True)
+schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['contains_nan'] == True].index, inplace=True)
 # reset index
 schaefer_exists_df = schaefer_exists_df.reset_index(drop=True, inplace=False)
 

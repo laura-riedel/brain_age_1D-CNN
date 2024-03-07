@@ -164,8 +164,7 @@ class UKBB_Schaefer_ts(Dataset):
             # limit df to available data points
             meta_df.drop(meta_df[meta_df['schaefer_exists'] == False].index, inplace=True)
             meta_df.drop(meta_df[meta_df['is_empty'] == True].index, inplace=True)
-            # drop held-out IDs
-            meta_df.drop(meta_df[meta_df['eid'].isin(heldout_ids)].index, inplace=True)
+            meta_df.drop(meta_df[meta_df['contains_nan'] == True].index, inplace=True)
         else:
             # keep only held-out IDs
             meta_df = meta_df[meta_df['eid'].isin(heldout_ids)]
@@ -197,6 +196,8 @@ class UKBB_Schaefer_ts(Dataset):
         # get filname/path to timeseries
         ts_path = self.data_path+'bids/sub-'+str(sub_id)+'/ses-2/func/sub-'+str(sub_id)+'_ses-2_task-rest_Schaefer'+self.schaefer_variant+'.csv.gz'
         
+        print(sub_id)
+        
         # load + standardise timeseries
         # don't include the first column that names the networks/parcellations ############# CHECK HOW MANY TIME POINTS
         timeseries = np.loadtxt(ts_path, skiprows=1, usecols=tuple([i for i in range(1,491)]), delimiter=',') 
@@ -210,10 +211,18 @@ class UKBB_Schaefer_ts(Dataset):
             else:
                 raise NameError(f"Correlation kind {self.corr_kind} is not defined")        
             # turn data into tensors
-            model_input, label = self.to_tensor(correlation_matrix, label)
+            #model_input, label = self.to_tensor(correlation_matrix, label)
+            correlation_matrix = torch.from_numpy(correlation_matrix)
+            model_input = correlation_matrix.float()
+            label = torch.tensor(label)
         else:
             # turn data into tensors
-            model_input, label = self.to_tensor(timeseries, label)
+            #model_input, label = self.to_tensor(timeseries, label)
+            timeseries = torch.from_numpy(timeseries)
+            model_input = timeseries.float()
+            label = torch.tensor(label)
+        
+        print('ts dtype --', model_input.dtype)
         
         return model_input, label, sub_id        
 
@@ -223,9 +232,9 @@ class UKBBDataModule(pl.LightningDataModule):
     Pytorch Lightning style DataModule class that prepares & loads timeseries
     of rs-fMRI data from the UKBioBank.
     Input:
-        data_path: path to ukb_data directory (ukb_data included). E.g. 'ritter/share/data/UKBB/ukb_data'.
         dataset_type: which torch Dataset to use for loading data. This determins the data modality 
             (ICA ts ("UKBB_ICA_ts") or Schaefer ts ("UKBB_Schaefer_ts")) and consequently which input variables have an effect.
+        data_path: path to ukb_data directory (ukb_data included). E.g. 'ritter/share/data/UKBB/ukb_data'.
         ica: whether to load ICA25 ('25') or ICA100 ('100'). Expects string. Default: 25.
         good_components: boolean flag to indicate whether to use only the good components or all components. Default: False.
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
@@ -242,10 +251,14 @@ class UKBBDataModule(pl.LightningDataModule):
             held-out IDs are dropped from meta_df, if False, only held-out IDs are kept. Default: True.
         batch_size: batch size for DataLoaders. Default: 128.
         seed: random seed that is used. Default: 43.
-        train_ratio:
-        val_test_ratio:
+        train_ratio: first parameter for train/val/test split regulation. 
+            On a scale from 0 to 1, which proportion of data is to be used for training? Default: 0.88.
+        val_test_ratio: second parameter for train/val/test split regulation.
+            On a sclae form 0 to 1, which proportion of the split not used for training is to be used for 
+            validating/testing? >0.5: more data for validation; <0.5: more data for testing. Default: 0.5.
     """
-    def __init__(self, data_path, dataset_type, ica='25', good_components=False, schaefer_variant='7n100p', 
+    def __init__(self, dataset_type='UKBB_Schaefer_ts', data_path='/ritter/share/data/UKBB/ukb_data/',
+                 ica='25', good_components=False, schaefer_variant='7n100p', 
                  corr_matrix=False, corr_kind='pearson',
                  heldout_path='../../data/schaefer/heldout_test_set.csv', all_data=True, dev=True, 
                  batch_size=128, seed=43, train_ratio=0.8, val_test_ratio=0.5): 
@@ -265,6 +278,7 @@ class UKBBDataModule(pl.LightningDataModule):
         self.seed = seed
         self.train_ratio = train_ratio
         self.val_test_ratio = val_test_ratio
+        self.data = None
         # increase reproducibility
         utils.make_reproducible(seed)
         self.g = torch.Generator() # device='cuda'
@@ -280,7 +294,7 @@ class UKBBDataModule(pl.LightningDataModule):
         if self.dataset_type == 'UKBB_ICA_ts':
             self.data = UKBB_ICA_ts(self.data_path, self.ica, self.good_components, self.all_data) 
         elif self.dataset_type == 'UKBB_Schaefer_ts':
-            self.data = UKBB_Schaefer_ts(self.data_path, self.schaefer_variant, self.corr_matrix, self.corr_kind, self.heldout_path, self.all_data, self.dev) ##################### !!!!!!!!!!1
+            self.data = UKBB_Schaefer_ts(self.data_path, self.schaefer_variant, self.corr_matrix, self.corr_kind, self.heldout_path, self.all_data, self.dev) 
 
         dataset_size = self.data.labels['eid'].shape[0]
         indices = list(self.data.labels['eid'])  

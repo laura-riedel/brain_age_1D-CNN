@@ -2,15 +2,18 @@
 """
 This script iterates through all subjects within the saved UK BioBank BIDS directory (see ukbb_dir) and checks 
 a) whether files of Schaefer parcellation rs-fMRI timeseries exist for this subject and
-b) whether the existing files actually contain timeseries content or are empty.
+b) whether the existing files actually contain timeseries content or are empty and
+c) whether the non-empty files contain NaN values.
 
 Two overviews are created in the specified directory (schaefer_data_dir):
-- `schaefer_exists.csv`: 3 columns (eid, schaefer_exists, is_empty) which states for each subject ID 
-                        if files exist (schaefer_exists -> Bool) and whether they are empty (is_empty -> Bool)
+- `schaefer_exists.csv`: 4 columns (eid, schaefer_exists, is_empty, contains_nan) which states for each subject ID 
+                        if files exist (schaefer_exists -> Bool), whether they are empty (is_empty -> Bool) and
+                        whether they contain NaN values (contains_nan -> Bool).
 - `empty_files.csv`: simple collection of the subject IDs containing empty Schaefer files
 """
 # import packages
 import pandas as pd
+import numpy as np
 import os
 import csv
 
@@ -27,10 +30,15 @@ def strip_id(string):
 subs = [f.name for f in os.scandir(ukbb_dir) if f.is_dir()]
 
 # prepare df for collection
-schaefer_exists_df = pd.DataFrame(columns=['eid','schaefer_exists','is_empty'])
+schaefer_exists_df = pd.DataFrame(columns=['eid','schaefer_exists','is_empty', 'contains_nan'])
 
 # take note of empty files
 exceptions = []
+
+# set up column defaults
+schaefer_exists_df['schaefer_exists'] = False
+schaefer_exists_df['is_empty'] = True
+schaefer_exists_df['contains_nan'] = False
 
 # find out for which eid Schaefer parcellation timeseries data exist
 i = 0
@@ -44,12 +52,13 @@ for sub in subs:
         if os.path.getsize(sub_dir) > 0:
             # if not empty
             schaefer_exists_df.loc[schaefer_exists_df['eid'] == sub_id, 'is_empty'] = False
+            timeseries = np.genfromtxt(sub_dir, skip_header=1, usecols=tuple([i for i in range(1,491)]), delimiter=',') 
+            # check for NaN values, update column if True
+            if np.isnan(timeseries).any():
+                schaefer_exists_df.loc[schaefer_exists_df['eid'] == sub_id, 'contains_nan'] = True
         else:
             # if empty
             exceptions.append(sub_id)
-            schaefer_exists_df.loc[schaefer_exists_df['eid'] == sub_id, 'is_empty'] = True
-    else:
-        schaefer_exists_df.loc[schaefer_exists_df['eid'] == sub_id, 'schaefer_exists'] = False
     i += 1
         
 # save
