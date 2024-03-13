@@ -159,12 +159,9 @@ class UKBB_Schaefer_ts(Dataset):
             meta_df.drop(meta_df[meta_df['schaefer_exists'].isna() == True].index, inplace=True)
             meta_df.drop(meta_df[meta_df['schaefer_exists'] == False].index, inplace=True)
             meta_df.drop(meta_df[meta_df['is_empty'] == True].index, inplace=True)
+            meta_df.drop(meta_df[meta_df['contains_nan'] == True].index, inplace=True)
             # drop held-out IDs
             meta_df.drop(meta_df[meta_df['eid'].isin(heldout_ids)].index, inplace=True)
-            # limit df to available data points
-            meta_df.drop(meta_df[meta_df['schaefer_exists'] == False].index, inplace=True)
-            meta_df.drop(meta_df[meta_df['is_empty'] == True].index, inplace=True)
-            meta_df.drop(meta_df[meta_df['contains_nan'] == True].index, inplace=True)
         else:
             # keep only held-out IDs
             meta_df = meta_df[meta_df['eid'].isin(heldout_ids)]
@@ -213,6 +210,7 @@ class UKBB_Schaefer_ts(Dataset):
             correlation_matrix = torch.from_numpy(correlation_matrix)
             model_input = correlation_matrix.float()
             label = torch.tensor(label)
+            label = label.float()
         else:
             # turn data into tensors
             #model_input, label = self.to_tensor(timeseries, label)
