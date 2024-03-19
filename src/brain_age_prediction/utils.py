@@ -439,6 +439,14 @@ def detrend_bag(df, single=False):
     return df
     
 def strip_network_names(name, remove_hemisphere=False):
+    """
+    Strips long Schaefer parcellation network names to contain only the pure network names.
+    Input:
+        name: network name (str), e.g. '7Networks_LH_Vis_1'.
+        remove_hemisphere: Boolean flag. If True, strips LH_/RH_, too. Default: False.
+    Output:
+        name: stripped network name (str), e.g. 'LH_Vis' (or 'Vis' if remove_hemisphere = True).
+    """
     pattern_l = r'^\d+Networks_'
     pattern_r = r'_\d+$'
     if remove_hemisphere:
