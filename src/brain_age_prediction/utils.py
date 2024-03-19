@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import re
 import random
 import logging
 from typing import Any, Dict, Generator, Optional
@@ -437,3 +438,12 @@ def detrend_bag(df, single=False):
         df.loc[:,'bag_ICA100_detrended'] = y_100-trend_100
     return df
     
+def strip_network_names(name, remove_hemisphere=False):
+    pattern_l = r'^\d+Networks_'
+    pattern_r = r'_\d+$'
+    if remove_hemisphere:
+        name = re.sub(pattern_l+'[L|R]H_','',name)
+    else:
+        name = re.sub(pattern_l,'',name)
+    name = re.sub(pattern_r,'',name)
+    return name
