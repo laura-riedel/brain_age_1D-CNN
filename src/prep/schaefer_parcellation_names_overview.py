@@ -15,4 +15,4 @@ for variant in variants:
     ts_path = ukbb_dir+'sub-1000014/ses-2/func/sub-1000014_ses-2_task-rest_Schaefer'+variant+'.csv.gz'
     ts_df = pd.read_csv(ts_path)
     # save
-    ts_df['label_name'].to_csv(schaefer_data_dir+'variant/'+'label_names_'+variant+'.csv', header=False, index=False)
+    ts_df['label_name'].to_csv(schaefer_data_dir+variant+'/label_names_'+variant+'.csv', header=False, index=False)
