@@ -112,61 +112,59 @@ class UKBB_Schaefer_ts(Dataset):
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. Default: '7n100p'.
+        shared_variants: list of Schaefer variants which share usable subject IDs. 
+            Default: ['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p']
         corr_matrix: boolean flag to determine whether to use the ordinary Schaefer timeseries (=False)
             or a subject-wise functional connectivity correlation matrix (=True). Default: False.
         corr_kind: Type of correlation coefficients to calculate if corr_matrix=True. Default: 'pearson'.
-        heldout_path: path to held-out test set IDs created with `define_heldout_test_set.py` that are 
+        additional_data_path: path to additional data info directory. Default: '../../data/schaefer/'.
+        heldout_set_name: name of held-out test set IDs created with `define_heldout_test_set.py` that are 
             totally removed from the initial training/testing of models. 
-            Default: '../../data/schaefer/heldout_test_set.csv'
+            Default: 'heldout_test_set_100-500p.csv'.
         all_data: boolean flag to indicate whether to use all data or only a subset of 100 samples. Default: True.
         dev: boolean flag to indicate whether model training/testing is still in the development phase. If True,
             held-out IDs are dropped from meta_df, if False, only held-out IDs are kept. Default: True.
     """
-    def __init__(self, data_path, schaefer_variant='7n100p', corr_matrix=False, corr_kind='pearson', heldout_path='../../data/schaefer/heldout_test_set.csv', all_data=True, dev=True):
+    def __init__(self, data_path, schaefer_variant='7n100p', shared_variants=['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p'], corr_matrix=False, corr_kind='pearson', additional_data_path='../../data/schaefer/', heldout_set_name='heldout_test_set_100-500p.csv', all_data=True, dev=True):
         # save data path + settings
         self.data_path = data_path
         self.schaefer_variant = schaefer_variant
+        self.shared_variants = shared_variants
         self.corr_matrix = corr_matrix
         self.corr_kind = corr_kind
-        self.heldout_path = heldout_path
+        self.additional_data_path = additional_data_path
+        self.heldout_path = additional_data_path+heldout_set_name
         self.all_data = all_data
         self.dev = dev
-        self.additional_data = '../../data/schaefer/'
 
         possible_variants = ['7n100p','7n200p','7n500p','7n700p','7n1000p',
                              '17n100p','17n200p','17n500p','17n700p','17n1000p']
         
         assert self.schaefer_variant in possible_variants, 'Given variant does not exist. Check typos!'
         
+        # get ID infos for relevant variants
+        usable_ids = set(utils.get_usable_schaefer_ids(schaefer_data_dir=self.additional_data_path, variants=shared_variants))
         heldout_ids = set(np.loadtxt(heldout_path, dtype=int))
 
         # META INFORMATION
         # get target information (age)
         age_df = pd.read_csv(self.data_path+'table/targets/age.tsv', sep='\t', names=['age'])
-        # get subject IDs, rename column for later merge
+        # get subject IDs, rename column 
         ids_df = pd.read_csv(self.data_path+'table/ukb_imaging_filtered_eids.txt')
         ids_df.rename(columns={'f.eid': 'eid'}, inplace=True)
-        # get info if Schaefer ts exists for subs
-        schaefer_exists_df = pd.read_csv(self.additional_data+'schaefer_exists.csv')
         # combine information
-        # first ids and age
         meta_df = pd.concat([ids_df, age_df], axis=1)
-        # merge with info of files' existence based on eid
-        meta_df = meta_df.merge(schaefer_exists_df, on='eid', how='left')
         # only keep relevant IDs
         if self.dev:
             # limit df to available data points
-            meta_df.drop(meta_df[meta_df['schaefer_exists'].isna() == True].index, inplace=True)
-            meta_df.drop(meta_df[meta_df['schaefer_exists'] == False].index, inplace=True)
-            meta_df.drop(meta_df[meta_df['is_empty'] == True].index, inplace=True)
-            meta_df.drop(meta_df[meta_df['contains_nan'] == True].index, inplace=True)
+            meta_df = meta_df[meta_df['eid'].isin(usable_ids)]
             # drop held-out IDs
             meta_df.drop(meta_df[meta_df['eid'].isin(heldout_ids)].index, inplace=True)
         else:
             # keep only held-out IDs
             meta_df = meta_df[meta_df['eid'].isin(heldout_ids)]
         # reset index
-        meta_df = meta_df.reset_index(drop=True, inplace=False)
+        meta_df.reset_index(drop=True, inplace=True)
         
         # reduce amount of data for debugging etc.
         if not self.all_data:
@@ -179,13 +177,13 @@ class UKBB_Schaefer_ts(Dataset):
     def __len__(self):
         return len(self.labels)
     
-    def to_tensor(data, label):
-        """
-        Make input + label PyTorch compatible by turning arrays into tensors.
-        """
-        data = torch.from_numpy(data)
-        label = torch.tensor(label)
-        return data.float(), label.float()
+    #def to_tensor(data, label):
+     #   """
+      #  Make input + label PyTorch compatible by turning arrays into tensors.
+       # """
+        #data = torch.from_numpy(data)
+        #label = torch.tensor(label)
+        #return data.float(), label.float()
     
     def __getitem__(self, sub_id):       
         # get label (age)
@@ -235,12 +233,15 @@ class UKBBDataModule(pl.LightningDataModule):
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. Default: '7n100p'.
+        shared_variants: list of Schaefer variants which share usable subject IDs. 
+            Default: ['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p']
         corr_matrix: boolean flag to determine whether to use the ordinary Schaefer timeseries (=False)
             or a subject-wise functional connectivity correlation matrix (=True). Default: False.
         corr_kind: Type of correlation coefficients to calculate if corr_matrix=True. Default: 'pearson'.
-        heldout_path: path to held-out test set IDs created with `define_heldout_test_set.py` that are 
+        additional_data_path: path to additional data info directory. Default: '../../data/schaefer/'.
+        heldout_set_name: name of held-out test set IDs created with `define_heldout_test_set.py` that are 
             totally removed from the initial training/testing of models. 
-            Default: '../../data/schaefer/heldout_test_set.csv'
+            Default: 'heldout_test_set_100-500p.csv'.
         all_data: boolean flag to indicate whether to use all data or only a subset of 100 samples. Default: True.
         dev: boolean flag to indicate whether model training/testing is still in the development phase. If True,
             held-out IDs are dropped from meta_df, if False, only held-out IDs are kept. Default: True.
@@ -253,9 +254,11 @@ class UKBBDataModule(pl.LightningDataModule):
             validating/testing? >0.5: more data for validation; <0.5: more data for testing. Default: 0.5.
     """
     def __init__(self, dataset_type='UKBB_Schaefer_ts', data_path='/ritter/share/data/UKBB/ukb_data/',
-                 ica='25', good_components=False, schaefer_variant='7n100p', 
+                 ica='25', good_components=False, 
+                 schaefer_variant='7n100p', shared_variants=['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p'],
                  corr_matrix=False, corr_kind='pearson',
-                 heldout_path='../../data/schaefer/heldout_test_set.csv', all_data=True, dev=True, 
+                 additional_data_path='../../data/schaefer/', heldout_set_name='heldout_test_set_100-500p.csv', 
+                 all_data=True, dev=True, 
                  batch_size=128, seed=43, train_ratio=0.8, val_test_ratio=0.5): 
         super().__init__()
         self.save_hyperparameters()
@@ -264,9 +267,11 @@ class UKBBDataModule(pl.LightningDataModule):
         self.ica = ica
         self.good_components = good_components
         self.schaefer_variant = schaefer_variant
+        self.shared_variants = shared_variants
         self.corr_matrix = corr_matrix
         self.corr_kind = corr_kind
-        self.heldout_path = heldout_path
+        self.additional_data_path = additional_data_path
+        self.heldout_set_name = heldout_set_name
         self.all_data = all_data
         self.dev = dev
         self.batch_size = batch_size
@@ -289,7 +294,7 @@ class UKBBDataModule(pl.LightningDataModule):
         if self.dataset_type == 'UKBB_ICA_ts':
             self.data = UKBB_ICA_ts(self.data_path, self.ica, self.good_components, self.all_data) 
         elif self.dataset_type == 'UKBB_Schaefer_ts':
-            self.data = UKBB_Schaefer_ts(self.data_path, self.schaefer_variant, self.corr_matrix, self.corr_kind, self.heldout_path, self.all_data, self.dev) 
+            self.data = UKBB_Schaefer_ts(self.data_path, self.schaefer_variant, self.shared_variants, self.corr_matrix, self.corr_kind, self.additional_data_path, self.heldout_set_name, self.all_data, self.dev) 
 
         dataset_size = self.data.labels['eid'].shape[0]
         indices = list(self.data.labels['eid'])  
