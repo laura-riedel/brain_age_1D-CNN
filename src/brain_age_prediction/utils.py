@@ -387,6 +387,50 @@ def get_metadata(path_to_data_info, ukbb_data_path, index=True):
     meta_df = data_overview.merge(meta_df, on='eid', how='left')
     return meta_df
 
+def get_schaefer_overview(schaefer_data_dir='../../data/schaefer/', 
+                          variants=['7n100p','7n200p','7n500p','7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p']):
+    """
+    Collect all information about the availability of subject data in one dataframe.
+    Input:
+        schaefer_data_dir: path to local schaefer directory containing subfolders for each variant. Default: '../../data/schaefer/'.
+        variants: list of variants of interest. Default: all variants.
+    Output:
+        schaefer_exists_df: overview pandas dataframe.
+    """
+    # initial df with first variant 
+    schaefer_exists_df = pd.read_csv(schaefer_data_dir+variants[0]+'/schaefer_exists.csv')
+    # add other variants if applicable
+    if len(variants) > 1:
+        for variant in variants[1:]:
+            variant_df = pd.read_csv(schaefer_data_dir+variant+'/schaefer_exists.csv')
+            schaefer_exists_df = schaefer_exists_df.merge(variant_df, how='left', on='eid', suffixes=(None,'_'+variant))
+    # add first variant name to according columns 
+    rename_dict = {'schaefer_exists': 'schaefer_exists_'+variants[0],
+                   'is_empty': 'is_empty_'+variants[0],
+                   'contains_nan': 'contains_nan_'+variants[0],
+                   'contains_0': 'contains_0_'+variants[0],
+                   'location_of_0': 'location_of_0_'+variants[0]}
+    schaefer_exists_df.rename(columns=rename_dict, inplace=True)
+    return schaefer_exists_df
+
+def get_usable_schaefer_ids(schaefer_data_dir='../../data/schaefer/', 
+                            variants=['7n100p','7n200p','7n500p','7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p']):
+    """
+    Get those subject IDs for which we have usable Schaefer variant files.
+    Input:
+        schaefer_data_dir: path to local schaefer directory containing subfolders for each variant. Default: '../../data/schaefer/'.
+        variants: list of variants of interest. Default: all variants.
+    Output:
+        list of relevant subject IDs
+    """
+    schaefer_exists_df = get_schaefer_overview(schaefer_data_dir, variants)
+    for variant in variants:  
+        schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['schaefer_exists_'+variant]==False].index, inplace=True)
+        schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['is_empty_'+variant]==True].index, inplace=True)
+        schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['contains_nan_'+variant]==True].index, inplace=True)
+        schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['contains_0_'+variant]==True].index, inplace=True)
+    return list(schaefer_exists_df['eid']) 
+
 #### OTHER HELPER FUNCTIONS
 def calculate_bag(df, single=False):
     """
