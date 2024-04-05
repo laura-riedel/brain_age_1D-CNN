@@ -1,0 +1,25 @@
+project: 'lightweight-brain-age-prediction'
+group: 'ica_ts'
+name: '25_defaults'
+tags: ['25']
+parameters:
+    # dataset set-up
+    ica: '25'
+    good_components: False
+    # training set-up
+    max_epochs: 3
+    log_steps: 50
+    patience: 15
+    # model parameters
+    in_channels: 25
+    kernel_size: 6
+    lr: 5.7194389964362656e-05
+    depth: 1
+    start_out: 64
+    stride: 4
+    weight_decay: 0.1
+    dilation: 1
+    conv_dropout: 0
+    final_dropout: 0
+    double_conv: True
+    batch_norm: True
