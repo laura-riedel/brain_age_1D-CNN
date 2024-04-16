@@ -21,7 +21,7 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=True, devices=None, dev=True, batch_size=128, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, finish=False):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epoch=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, finish=False):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
@@ -37,6 +37,8 @@ def wandb_train(config, name=None, tags=None, use_gpu=True, devices=None, dev=Tr
         dev: boolean flag to indicate whether model training/testing is still in the development phase. If True,
             held-out IDs are dropped from meta_df, if False, only held-out IDs are kept. Default: True.
         batch_size: batch size for DataLoaders. Default: 128.
+        max_epoch: for how many epochs the model is supposed to train. Defaults to max_epochs in the config.
+        num_threads: if CPU, how many CPU threads to use. Default: 1.
         seed: random seed that is used. Default: 43.
         train_ratio: first parameter for train/val/test split regulation. 
             On a scale from 0 to 1, which proportion of data is to be used for training? Default: 0.88.
@@ -61,17 +63,20 @@ def wandb_train(config, name=None, tags=None, use_gpu=True, devices=None, dev=Tr
                     tags=tags,
                     config=config['parameters']) as run: 
         # update config with additional settings
+        run.config['batch_size'] = batch_size
+        if max_epoch is not None:
+            run.config['max_epoch'] = max_epoch
         run.config['dev'] = dev
         run.config['seed'] = seed
         run.config['train_ratio'] = train_ratio
-        run.config['val_test_ration'] = val_test_ratio
+        run.config['val_test_ratio'] = val_test_ratio
         if use_gpu:
             run.config['accelerator'] = 'gpu'
             if devices is None:
                 devices = [1]
         else:
             # make sure only one CPU thread is used
-            torch.set_num_threads(1)
+            torch.set_num_threads(num_threads)
             run.config['accelerator'] = 'cpu'
             devices = 'auto'
             
@@ -105,34 +110,25 @@ def wandb_train(config, name=None, tags=None, use_gpu=True, devices=None, dev=Tr
                                              corr_matrix=updated_config.corr_matrix,
                                              heldout_path=updated_config.heldout_path,
                                              dev=updated_config.dev,
-                                             batch_size=batch_size, 
-                                             seed=43, 
-                                             train_ratio=0.8, 
-                                             val_test_ratio=0.5
+                                             batch_size=config.batch_size, 
+                                             seed=updated_config.seed, 
+                                             train_ratio=updated_config.train_ratio, 
+                                             val_test_ratio=updated_config.val_test_ratio,
                                             )
         
             # initialise variable1DCNN model
-            # catch cases where the model architecture is impossible
-            # or would cause memory issues
-            try:
-                model = models.variable1DCNN(in_channels=updated_config.in_channels,
-                                                    kernel_size=updated_config.kernel_size,
-                                                    lr=updated_config.lr,
-                                                    depth=updated_config.depth,
-                                                    start_out=updated_config.start_out,
-                                                    stride=updated_config.stride,
-                                                    conv_dropout=updated_config.conv_dropout,
-                                                    final_dropout=updated_config.final_dropout,
-                                                    weight_decay=updated_config.weight_decay,
-                                                    double_conv=updated_config.double_conv,
-                                                    batch_norm=updated_config.batch_norm,
-                                                    execution='nb') 
-            except:     
-                # add tag for later filtering
-                run.tags = run.tags + ('impossible_architecture_or_oom',) 
-                # finish run 
-                wandb.finish(exit_code=555)
-                sys.exit()
+            model = models.variable1DCNN(in_channels=updated_config.in_channels,
+                                        kernel_size=updated_config.kernel_size,
+                                        lr=updated_config.lr,
+                                        depth=updated_config.depth,
+                                        start_out=updated_config.start_out,
+                                        stride=updated_config.stride,
+                                        conv_dropout=updated_config.conv_dropout,
+                                        final_dropout=updated_config.final_dropout,
+                                        weight_decay=updated_config.weight_decay,
+                                        double_conv=updated_config.double_conv,
+                                        batch_norm=updated_config.batch_norm,
+                                        execution='nb') 
 
         # train model
         trainer.fit(model, datamodule=datamodule)
