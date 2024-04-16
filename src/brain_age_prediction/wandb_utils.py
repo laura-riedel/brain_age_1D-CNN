@@ -21,7 +21,7 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epoch=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, finish=False):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, finish=False):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
@@ -37,7 +37,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         dev: boolean flag to indicate whether model training/testing is still in the development phase. If True,
             held-out IDs are dropped from meta_df, if False, only held-out IDs are kept. Default: True.
         batch_size: batch size for DataLoaders. Default: 128.
-        max_epoch: for how many epochs the model is supposed to train. Defaults to max_epochs in the config.
+        max_epochs: for how many epochs the model is supposed to train. Defaults to max_epochs in the config.
         num_threads: if CPU, how many CPU threads to use. Default: 1.
         seed: random seed that is used. Default: 43.
         train_ratio: first parameter for train/val/test split regulation. 
@@ -64,8 +64,8 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                     config=config['parameters']) as run: 
         # update config with additional settings
         run.config['batch_size'] = batch_size
-        if max_epoch is not None:
-            run.config['max_epoch'] = max_epoch
+        if max_epochs is not None:
+            run.config['max_epochs'] = max_epochs
         run.config['dev'] = dev
         run.config['seed'] = seed
         run.config['train_ratio'] = train_ratio
@@ -108,7 +108,9 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                                              dataset_type='UKBB_Schaefer_ts',
                                              schaefer_variant=updated_config.schaefer_variant,
                                              corr_matrix=updated_config.corr_matrix,
-                                             heldout_path=updated_config.heldout_path,
+                                             shared_variants=updated_config.shared_variants,
+                                             additional_data_path=updated_config.additional_data_path,
+                                             heldout_set_name=updated_config.heldout_set_name,
                                              dev=updated_config.dev,
                                              batch_size=config.batch_size, 
                                              seed=updated_config.seed, 
