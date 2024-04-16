@@ -21,7 +21,7 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, finish=False):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, all_data=True, finish=False):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
@@ -46,6 +46,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
             On a sclae form 0 to 1, which proportion of the split not used for training is to be used for 
             validating/testing? >0.5: more data for validation; <0.5: more data for testing. Default: 0.5.
         save_datasplit: Boolean flag whether to save the applied data split as W&B artifact. Default: True.
+        all_data: boolean flag to indicate whether to use all data or only a subset of 100 samples. Default: True.
         finish: boolean flag whether to finish a wandb run. Default: True.
     Output: (if finish=False)
         trainer: trainer instance (after model training).
@@ -70,6 +71,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         run.config['seed'] = seed
         run.config['train_ratio'] = train_ratio
         run.config['val_test_ratio'] = val_test_ratio
+        run.config['all_data'] = all_data
         if use_gpu:
             run.config['accelerator'] = 'gpu'
             if devices is None:
@@ -111,6 +113,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                                              shared_variants=updated_config.shared_variants,
                                              additional_data_path=updated_config.additional_data_path,
                                              heldout_set_name=updated_config.heldout_set_name,
+                                             all_data=updated_config.all_data,
                                              dev=updated_config.dev,
                                              batch_size=updated_config.batch_size, 
                                              seed=updated_config.seed, 

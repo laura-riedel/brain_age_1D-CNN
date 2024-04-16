@@ -168,7 +168,7 @@ class UKBB_Schaefer_ts(Dataset):
         
         # reduce amount of data for debugging etc.
         if not self.all_data:
-            meta_df = meta_df[0:100]
+            meta_df = meta_df[0:5000]
         
         # save meta_df information as labels
         self.labels = meta_df
