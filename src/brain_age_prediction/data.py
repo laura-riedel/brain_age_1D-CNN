@@ -144,7 +144,7 @@ class UKBB_Schaefer_ts(Dataset):
         
         # get ID infos for relevant variants
         usable_ids = set(utils.get_usable_schaefer_ids(schaefer_data_dir=self.additional_data_path, variants=shared_variants))
-        heldout_ids = set(np.loadtxt(heldout_path, dtype=int))
+        heldout_ids = set(np.loadtxt(self.heldout_path, dtype=int))
 
         # META INFORMATION
         # get target information (age)
