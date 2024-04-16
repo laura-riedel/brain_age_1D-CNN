@@ -112,7 +112,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                                              additional_data_path=updated_config.additional_data_path,
                                              heldout_set_name=updated_config.heldout_set_name,
                                              dev=updated_config.dev,
-                                             batch_size=config.batch_size, 
+                                             batch_size=updated_config.batch_size, 
                                              seed=updated_config.seed, 
                                              train_ratio=updated_config.train_ratio, 
                                              val_test_ratio=updated_config.val_test_ratio,
