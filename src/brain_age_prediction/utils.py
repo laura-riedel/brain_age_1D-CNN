@@ -152,7 +152,7 @@ def trainer_init(device, logger, log_steps=10, max_epochs=175, callbacks=[]):
 #### TRAIN + TEST MODELS WITH CONFIG DICT; PREDICT AGE WITH TRAINED MODEL
 def train_model(log_path, data_path, config, device, execution='nb'):
     """
-    Fuction for training a variable 1D-CNN model on a GPU using external config information.
+    Fuction for training a variable ICA 1D-CNN model on a GPU using external config information.
     Outputs a trained model.
     Input:
         log_path: path to where logs, checkpoints and data info should be saved
