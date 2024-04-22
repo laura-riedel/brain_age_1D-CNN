@@ -5,7 +5,7 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 # custom module
-from brain_age_prediction import data, models, utils
+from brain_age_prediction import data, models, utils, sklearn_utils
 
 # other
 import wandb
@@ -21,7 +21,7 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, all_data=True, finish=False):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, finish=False):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
@@ -46,6 +46,8 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
             On a sclae form 0 to 1, which proportion of the split not used for training is to be used for 
             validating/testing? >0.5: more data for validation; <0.5: more data for testing. Default: 0.5.
         save_datasplit: Boolean flag whether to save the applied data split as W&B artifact. Default: True.
+        save_overview: Boolean flag whether to save the idx/age overview as W&B artifact. 
+            Only effective with save_datasplit=True. Default: False.
         all_data: boolean flag to indicate whether to use all data or only a subset of 100 samples. Default: True.
         finish: boolean flag whether to finish a wandb run. Default: True.
     Output: (if finish=False)
@@ -140,8 +142,11 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         
         if save_datasplit:
             # take note of applied data split
-            # create a local data_info directory
-            utils.save_data_info('', datamodule, only_indices=True)
+            # create a local data_info directory (with or without overview)
+            if save_overview:
+                utils.save_data_info('', datamodule, only_indices=False)
+            else:
+                utils.save_data_info('', datamodule, only_indices=True)
             # create artifact for data split
             split_artifact = wandb.Artifact(name='split_indices', type='dataset')
             split_artifact.add_dir('data_info')
@@ -150,12 +155,13 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
             # remove local data_info directory
             shutil.rmtree('data_info')
         
-        if finish:
-            # finish run
-            run.finish()
-        else:
+        if not finish:
             # return trainer instance + datamodule
             return trainer, datamodule
+        
+    if finish:
+        # finish run
+        wandb.finish()
 
 # testing a model
 def wandb_test(trainer, datamodule, finish=True):
