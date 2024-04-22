@@ -319,6 +319,41 @@ def load_datainfo(path_to_data_info, info_type):
         info = pd.read_csv(path_to_data_info+'data_info/overview.csv')
     return info
 
+def get_data_overview_with_splitinfo(path_to_data_info, index=False):
+    """
+    Loads information from the data_info directory about participants' ages 
+    and in which split participants were present during model training/testing.
+    Input:
+        path_to_data_info: path to where data_info is saved (without data_info itself in path)
+        index: whether an item is retrieved based on index (=True) or based on subject id (=False). Default: False.
+    Output:
+        data_overview: participant/age/split overview as dataframe  
+    """
+    data_overview = load_datainfo(path_to_data_info, 'overview')
+    train_idx = load_datainfo(path_to_data_info, 'train_idx')
+    val_idx = load_datainfo(path_to_data_info, 'val_idx')
+    test_idx = load_datainfo(path_to_data_info, 'test_idx')
+    
+    # add split information to items in data_overview
+    if index:
+        # based on index
+        for idx in train_idx:
+            data_overview.loc[idx, 'split'] = 'train'
+        for idx in val_idx:
+            data_overview.loc[idx, 'split'] = 'val'
+        for idx in test_idx:
+            data_overview.loc[idx, 'split'] = 'test'
+    else:
+        # based on sub ID
+        for idx in train_idx:
+            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'train'
+        for idx in val_idx:
+            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'val'
+        for idx in test_idx:
+            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'test'
+            
+    return data_overview
+
 def get_metadata(path_to_data_info, ukbb_data_path, index=True):
     """
     Get additional information about participants used in model training/testing; 
@@ -331,25 +366,8 @@ def get_metadata(path_to_data_info, ukbb_data_path, index=True):
         meta_df: overview dataframe containing the IDs of included participants
                 with additional information regarding which split they were in + additional metadata
     """
-    data_overview = load_datainfo(path_to_data_info, 'overview')
-    train_idx = load_datainfo(path_to_data_info, 'train_idx')
-    val_idx = load_datainfo(path_to_data_info, 'val_idx')
-    test_idx = load_datainfo(path_to_data_info, 'test_idx')
-    # add split information to items in data_overview
-    if index:
-        for idx in train_idx:
-            data_overview.loc[idx, 'split'] = 'train'
-        for idx in val_idx:
-            data_overview.loc[idx, 'split'] = 'val'
-        for idx in test_idx:
-            data_overview.loc[idx, 'split'] = 'test'
-    else:
-        for idx in train_idx:
-            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'train'
-        for idx in val_idx:
-            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'val'
-        for idx in test_idx:
-            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'test'
+    data_overview = get_data_overview_with_splitinfo(path_to_data_info, index)
+    
     # META INFORMATION
     # match additional info with subject IDs
     # get subject IDs, rename column for later merge
