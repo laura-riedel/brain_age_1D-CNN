@@ -21,7 +21,7 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, finish=False):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
@@ -33,7 +33,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         tags: tags for the W&B run. Defaults to the tags in the config.
         use_gpu: Boolean flag indicating which accelerator to use for training. 
             Uses GPU if True and CPU if False. Default: False.
-        devices: The devices to use when training; depends on accelerator. Default: XXXXXX.
+        devices: The devices to use when training; depends on accelerator. Default for GPU use: [1].
         dev: boolean flag to indicate whether model training/testing is still in the development phase. If True,
             held-out IDs are dropped from meta_df, if False, only held-out IDs are kept. Default: True.
         batch_size: batch size for DataLoaders. Default: 128.
@@ -154,6 +154,9 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
             run.finish_artifact(split_artifact)
             # remove local data_info directory
             shutil.rmtree('data_info')
+        
+        if test:
+            trainer.test(ckpt_path='best', datamodule=datamodule)
         
         if not finish:
             # return trainer instance + datamodule
