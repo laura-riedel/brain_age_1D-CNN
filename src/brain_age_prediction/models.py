@@ -105,7 +105,10 @@ class variable1DCNN(pl.LightningModule):
         loss: loss to be used.
         lr: learning rate to be used.
         depth: model depth (number of convolutional layers).
-        start_out: output dimensionality for first convolutional layer that will be scaled up.
+        start_out: output dimensionality for first convolutional layer (or all). See scale_dim.
+                    Default: 32.
+        scale_dim: boolean flag determining whether start_out dimensionality will be scaled up. 
+                    Default: True.
         stride: stride for MaxPool layers.
         weight_decay: weight decay for optimiser.
         dilation: spacing between the kernel points.
@@ -119,7 +122,7 @@ class variable1DCNN(pl.LightningModule):
         A model.
     """
     def __init__(self, in_channels=25, kernel_size=5, activation=nn.ReLU(), loss=nn.MSELoss(), 
-                 lr=1e-3, depth=4, start_out=32, stride=2, weight_decay=0, dilation=1,
+                 lr=1e-3, depth=4, start_out=32, scale_dim=True, stride=2, weight_decay=0, dilation=1,
                  conv_dropout=0, final_dropout=0, double_conv=False, batch_norm=False, execution='nb'):
         super().__init__()
         self.in_channels = in_channels
@@ -129,6 +132,7 @@ class variable1DCNN(pl.LightningModule):
         self.lr = lr
         self.depth = depth
         self.start_out = start_out
+        self.scale_dim = scale_dim
         self.stride = stride
         self.conv_dropout = conv_dropout
         self.final_dropout = final_dropout
@@ -157,21 +161,26 @@ class variable1DCNN(pl.LightningModule):
         self.encoder = nn.Sequential()
         # add X sequences of convolutional layer, activation + maxpool
         for layer in range(self.depth):
-            # treat first layer a bit differently
-            if layer == 0:
-                self.add_conv_layer(self.in_channels, channel)
-            # all other layers
+            if scale_dim:
+                # treat first layer a bit differently
+                if layer == 0:
+                    self.add_conv_layer(self.in_channels, channel)
+                # all other layers
+                else:
+                    new_channel = channel*2
+                    self.add_conv_layer(channel, new_channel)
+                    # set output channel size as new input channel size
+                    channel = new_channel
+                # add second conv layer if flag = True (complete with activation (+ BatchNorm + dropout))
+                if self.double_conv:
+                    new_channel = channel*2
+                    self.add_conv_layer(channel, new_channel)
+                    # update output channel size again as new input channel size
+                    channel = new_channel
             else:
-                new_channel = channel*2
-                self.add_conv_layer(channel, new_channel)
-                # set output channel size as new input channel size
-                channel = new_channel
-            # add second conv layer if flag = True (complete with activation (+ BatchNorm + dropout))
-            if self.double_conv:
-                new_channel = channel*2
-                self.add_conv_layer(channel, new_channel)
-                # update output channel size again as new input channel size
-                channel = new_channel
+                self.add_conv_layer(self.in_channels, channel)
+                if self.double_conv:
+                    self.add_conv_layer(channel, channel)
             # add pooling layer
             if layer == self.depth-1:
                 # average pooling after last conv layer
