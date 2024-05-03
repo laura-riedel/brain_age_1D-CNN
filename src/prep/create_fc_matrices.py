@@ -1,7 +1,6 @@
 """
 Iterate through all known UKBB subjects. If they have Schaefer parcellation timeseries,
-calculate the full functional connectivity (FC) matrix as well as the upper triangle
-and save it as HDF5 file.
+calculate the functional connectivity (FC) matrix and save the upper triangle as HDF5 file.
 """
 
 import numpy as np
@@ -31,15 +30,13 @@ def get_fc_matrix(sub_id, variant):
 
 def create_hdf5_datasets(hdf5_group, sub_id, variant):
     """
-    Calls get_fc_matrix and then saves both the full FC matrix as well as just
-    the upper triangle of the FC matrix to the specified HDF5 group.
+    Calls get_fc_matrix and then saves the upper triangle of the FC matrix to the specified HDF5 group.
     Input:
         hdf5_group: previously determined HDF5 Group object to save the matrices to
         sub_id: subject ID for which to calculate the FC matrices
         variant: Schaefer parcellation variant for which to calculate the FC matrices
     """
     fc_matrix = get_fc_matrix(sub_id, variant)
-    hdf5_group.create_dataset(variant, data=fc_matrix, compression='gzip', compression_opts=9)
     hdf5_group.create_dataset(variant+'_triu', data=np.triu(fc_matrix, 1), compression='gzip', compression_opts=9)
 
 ##################################################################################
@@ -51,17 +48,14 @@ all_sub_ids = utils.get_schaefer_overview(variants=['7n100p'])['eid'].values
 ids_7n100p = utils.get_usable_schaefer_ids(variants=['7n100p'])
 ids_7n200p = utils.get_usable_schaefer_ids(variants=['7n200p'])
 ids_7n500p = utils.get_usable_schaefer_ids(variants=['7n500p'])
-ids_7n700p = utils.get_usable_schaefer_ids(variants=['7n700p'])
-ids_7n1000p = utils.get_usable_schaefer_ids(variants=['7n1000p'])
 ids_17n100p = utils.get_usable_schaefer_ids(variants=['17n100p'])
 ids_17n200p = utils.get_usable_schaefer_ids(variants=['17n200p'])
 ids_17n500p = utils.get_usable_schaefer_ids(variants=['17n500p'])
-ids_17n700p = utils.get_usable_schaefer_ids(variants=['17n700p'])
-ids_17n1000p = utils.get_usable_schaefer_ids(variants=['17n1000p'])
+
 # find unusable subject IDs
 unusable_ids = set(all_sub_ids)
-for parcellation in [set(ids_7n100p), set(ids_7n200p), set(ids_7n500p), set(ids_7n700p), set(ids_7n1000p), 
-                     set(ids_17n100p), set(ids_17n200p), set(ids_17n500p), set(ids_17n700p), set(ids_17n1000p)]:
+for parcellation in [set(ids_7n100p), set(ids_7n200p), set(ids_7n500p), 
+                     set(ids_17n100p), set(ids_17n200p), set(ids_17n500p)]:
     unusable_ids = unusable_ids-parcellation
 
 with h5py.File(save_dir+'schaefer_fc_matrices.hdf5', 'w') as hdf5:
@@ -79,12 +73,6 @@ with h5py.File(save_dir+'schaefer_fc_matrices.hdf5', 'w') as hdf5:
             if sub in ids_7n500p:
                 variant = '7n500p'
                 create_hdf5_datasets(grp, sub, variant)
-            if sub in ids_7n700p:
-                variant = '7n700p'
-                create_hdf5_datasets(grp, sub, variant)
-            if sub in ids_7n1000p:
-                variant = '7n1000p'
-                create_hdf5_datasets(grp, sub, variant)
             if sub in ids_17n100p:
                 variant = '17n100p'
                 create_hdf5_datasets(grp, sub, variant)
@@ -93,12 +81,6 @@ with h5py.File(save_dir+'schaefer_fc_matrices.hdf5', 'w') as hdf5:
                 create_hdf5_datasets(grp, sub, variant)
             if sub in ids_17n500p:
                 variant = '17n500p'
-                create_hdf5_datasets(grp, sub, variant)
-            if sub in ids_17n700p:
-                variant = '17n700p'
-                create_hdf5_datasets(grp, sub, variant)
-            if sub in ids_17n1000p:
-                variant = '17n1000p'
                 create_hdf5_datasets(grp, sub, variant)
         i += 1
     
