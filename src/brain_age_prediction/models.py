@@ -161,26 +161,27 @@ class variable1DCNN(pl.LightningModule):
         self.encoder = nn.Sequential()
         # add X sequences of convolutional layer, activation + maxpool
         for layer in range(self.depth):
-            if scale_dim:
-                # treat first layer a bit differently
-                if layer == 0:
-                    self.add_conv_layer(self.in_channels, channel)
-                # all other layers
-                else:
-                    new_channel = channel*2
-                    self.add_conv_layer(channel, new_channel)
-                    # set output channel size as new input channel size
-                    channel = new_channel
-                # add second conv layer if flag = True (complete with activation (+ BatchNorm + dropout))
-                if self.double_conv:
-                    new_channel = channel*2
-                    self.add_conv_layer(channel, new_channel)
-                    # update output channel size again as new input channel size
-                    channel = new_channel
-            else:
+            # treat first layer a bit differently
+            if layer == 0:
                 self.add_conv_layer(self.in_channels, channel)
-                if self.double_conv:
-                    self.add_conv_layer(channel, channel)
+            # all other layers
+            else:
+                if scale_dim:
+                    new_channel = channel*2
+                else:
+                    new_channel = channel
+                self.add_conv_layer(channel, new_channel)
+                # set output channel size as new input channel size
+                channel = new_channel
+            # add second conv layer if flag = True (complete with activation (+ BatchNorm + dropout))
+            if self.double_conv:
+                if scale_dim:
+                    new_channel = channel*2
+                else:
+                    new_channel = channel
+                self.add_conv_layer(channel, new_channel)
+                # update output channel size again as new input channel size
+                channel = new_channel
             # add pooling layer
             if layer == self.depth-1:
                 # average pooling after last conv layer
