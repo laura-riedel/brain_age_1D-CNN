@@ -21,7 +21,7 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False, execution='nb'):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
@@ -49,7 +49,10 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         save_overview: Boolean flag whether to save the idx/age overview as W&B artifact. 
             Only effective with save_datasplit=True. Default: False.
         all_data: boolean flag to indicate whether to use all data or only a subset of 100 samples. Default: True.
-        finish: boolean flag whether to finish a wandb run. Default: True.
+        test: boolean flag whether to test the trained model's performance on the test set. Default: False.
+        finish: boolean flag whether to finish a wandb run. Default: False.
+        execution: whether model is called from a Jupyter Notebook ('nb') or the terminal ('t'). 
+                    Teriminal call cannot handle dilation. Default: 'nb'.
     Output: (if finish=False)
         trainer: trainer instance (after model training).
         datamodule: datamodule used for training model.
@@ -129,13 +132,14 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                                         lr=updated_config.lr,
                                         depth=updated_config.depth,
                                         start_out=updated_config.start_out,
+                                        scale_dim=updated_config.scale_dim,
                                         stride=updated_config.stride,
+                                        weight_decay=updated_config.weight_decay,
                                         conv_dropout=updated_config.conv_dropout,
                                         final_dropout=updated_config.final_dropout,
-                                        weight_decay=updated_config.weight_decay,
                                         double_conv=updated_config.double_conv,
                                         batch_norm=updated_config.batch_norm,
-                                        execution='nb') 
+                                        execution=execution) 
 
         # train model
         trainer.fit(model, datamodule=datamodule)
