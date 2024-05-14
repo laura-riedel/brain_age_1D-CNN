@@ -1,0 +1,13 @@
+project: 'lightweight-brain-age-prediction'
+group: 'schaefer_fc_matrix'
+name: '7n100p_ridge_alpha-0.5'
+tags: ['ridge','7n','100p','alpha 0.5']
+parameters:
+    # dataset set-up
+    schaefer_variant: '7n100p'
+    shortcut: '100-500p'
+    shared_variants: ['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p']
+    matrix_dir: '/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'
+    flatten: True
+    # training set-up
+    alpha: 0.5
