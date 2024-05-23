@@ -1,6 +1,7 @@
 import numpy as np
 import wandb
 import h5py
+from scipy.stats import zscore
 
 # scikit-learn
 from sklearn.linear_model import Ridge
@@ -10,16 +11,22 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from brain_age_prediction import utils
 
 ##################################################################################
-def load_matrix(sub_id, schaefer_variant, 
+def load_matrix(sub_id, schaefer_variant, remove_0=False, flatten=False,
                 matrix_dir='/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'):
     """
     Load a single subject-specific FC matrix from a HDF5 file.
     """
     with h5py.File(matrix_dir, 'r') as f:
         matrix = f['bids'][str(sub_id)][schaefer_variant+'_triu'][()]
+    if remove_0:
+        triu = np.triu_indices(matrix.shape[0], k=1)
+        matrix = matrix[triu]
+    else:
+        if flatten:
+            matrix = matrix.ravel()
     return matrix
 
-def load_datasplit(split, schaefer_variant, 
+def load_datasplit(split, schaefer_variant, remove_0=False, flatten=False, normalise=False,
                    datasplit_dir='../../data/schaefer/', 
                    matrix_dir='/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'):
     """
@@ -30,6 +37,10 @@ def load_datasplit(split, schaefer_variant,
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. 
+        remove_0: Boolean flag whether to remove the 0s in the matrix; also flattens matrix to 1D array. 
+            Default: False.
+        flatten: Boolean flag whether to flatten the matrix (without removing 0s). Default: False.
+        normalise: Boolean flag whether to normalise each subjects FC matrix. Default: False.
         datasplit_dir: path to where the 'data_info/' directory is located.
         matrix_dir: path to where the Schaefer FC matrices are stored. Expects a HDF5 file.
     Output:
@@ -43,10 +54,12 @@ def load_datasplit(split, schaefer_variant,
     y = split_df['age'].to_numpy()
     sub_ids = split_df['eid'].to_numpy()
     # stack all subject FC matrices in one array
-    X = np.stack([load_matrix(sub_id,schaefer_variant,matrix_dir) for sub_id in sub_ids])
+    X = np.stack([load_matrix(sub_id,schaefer_variant,remove_0,flatten,matrix_dir) for sub_id in sub_ids])
+    if normalise:
+        X = zscore(X, axis=1)
     return X, y
 
-def load_dataset(schaefer_variant, 
+def load_dataset(schaefer_variant, remove_0=False, flatten=False, normalise=False,
                  datasplit_dir='../../data/schaefer/',  
                  matrix_dir='/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'):
     """
@@ -55,6 +68,10 @@ def load_dataset(schaefer_variant,
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. 
+        remove_0: Boolean flag whether to remove the 0s in the matrix; also flattens matrix to 1D array. 
+            Default: False.
+        flatten: Boolean flag whether to flatten the matrix (without removing 0s). Default: False.
+        normalise: Boolean flag whether to normalise each subjects FC matrix. Default: False.
         datasplit_dir: path to where the 'data_info/' directory is located.
         matrix_dir: path to where the Schaefer FC matrices are stored. Expects a HDF5 file.
     Output:
@@ -63,14 +80,14 @@ def load_dataset(schaefer_variant,
             y: labels aka ages of subjects as 1D array
     """
     print('Load train set...')
-    X_train, y_train = load_datasplit('train', schaefer_variant, datasplit_dir, matrix_dir)
+    X_train, y_train = load_datasplit('train', schaefer_variant, remove_0, flatten, normalise, datasplit_dir, matrix_dir)
     print('Load val set...')
-    X_val, y_val = load_datasplit('val', schaefer_variant, datasplit_dir, matrix_dir)
+    X_val, y_val = load_datasplit('val', schaefer_variant, remove_0, flatten, normalise, datasplit_dir, matrix_dir)
     print('Load test set...')
-    X_test, y_test = load_datasplit('test', schaefer_variant, datasplit_dir, matrix_dir)
+    X_test, y_test = load_datasplit('test', schaefer_variant, remove_0, flatten, normalise, datasplit_dir, matrix_dir)
     return X_train, y_train, X_val, y_val, X_test, y_test
 
-def access_datasplit(split, schaefer_variant, flatten=False, shortcut='100-500p',
+def access_datasplit(split, schaefer_variant, no_0=False, normalise=False, shortcut='100-500p',
                      matrix_dir='/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'):
     """
     Loads specified data split of specified Schaefer variant from the dataset shortcut
@@ -80,7 +97,9 @@ def access_datasplit(split, schaefer_variant, flatten=False, shortcut='100-500p'
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. 
-        flatten: Boolean flag whether to transform the 3D data (X) into a 2D array. Default: False.
+        no_0: Boolean flag whether to include the 0s in the matrix; also flattens matrix to 1D array. 
+            Default: False.
+        normalise: Boolean flag whether to normalise each subjects FC matrix. Default: False.
         shortcut: name of the shortcut directory to use; based on the underlying heldout test set used.
             Default: '100-500p'
         matrix_dir: path to where the Schaefer FC matrices are stored. Expects a HDF5 file.
@@ -89,14 +108,18 @@ def access_datasplit(split, schaefer_variant, flatten=False, shortcut='100-500p'
         y: labels aka ages of subjects as 1D array
     """
     with h5py.File(matrix_dir, 'r') as f:
-        X = f['split_shortcuts'][shortcut][schaefer_variant][split]['X'][()]
+        addendum = ''
+        if no_0:
+            addendum = '_no-0'
+        else:
+            addendum = '_flattened'
+        X = f['split_shortcuts'][shortcut][schaefer_variant][split]['X'+addendum][()]
         y = f['split_shortcuts'][shortcut][schaefer_variant][split]['y'][()]
-    if flatten:
-        nsamples, nx, ny = X.shape
-        X = X.reshape((nsamples,nx*ny))
+        if normalise:
+            X = zscore(X, axis=1)
     return X, y
 
-def access_dataset(schaefer_variant, flatten=False, shortcut='100-500p',
+def access_dataset(schaefer_variant, no_0=False, normalise=False, shortcut='100-500p',
                    matrix_dir='/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'):
     """
     Loads train, val and test datasplits of specified Schaefer variant from 
@@ -105,24 +128,28 @@ def access_dataset(schaefer_variant, flatten=False, shortcut='100-500p',
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. 
-        flatten: Boolean flag whether to transform the 3D data (X) into a 2D array. Default: False.
+        no_0: Boolean flag whether to include the 0s in the matrix; also flattens matrix to 1D array. 
+            Default: False.
+        normalise: Boolean flag whether to normalise each subjects FC matrix. Default: False.
         shortcut: name of the shortcut directory to use; based on the underlying heldout test set used.
-            Default: '100-500p'
+            Default: '100-500p'.
+        normalise: Boolean flag whether to normalise all X inputs. Default: False.
         matrix_dir: path to where the Schaefer FC matrices are stored. Expects a HDF5 file.
     Output:
         For each split (train/val/test):
             X: 3D (or 2D, if flatten=True) array of stacked FC matrices relevant for the split.
             y: labels aka ages of subjects as 1D array
     """
-    X_train, y_train = access_datasplit('train', schaefer_variant, flatten, shortcut, matrix_dir)
-    X_val, y_val = access_datasplit('val', schaefer_variant, flatten, shortcut, matrix_dir)
-    X_test, y_test = access_datasplit('test', schaefer_variant, flatten, shortcut, matrix_dir)
+    X_train, y_train = access_datasplit('train', schaefer_variant, no_0, normalise, shortcut, matrix_dir)
+    X_val, y_val = access_datasplit('val', schaefer_variant, no_0, normalise, shortcut, matrix_dir)
+    X_test, y_test = access_datasplit('test', schaefer_variant, no_0, normalise, shortcut, matrix_dir)
+    
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 ##################################################################################
 # W&B training / testing
 
-def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, shortcut=None, alpha=None, seed=43, plot=True):
+def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, shortcut=None, alpha=None, no_0=None, normalise=None, seed=43, plot=True):
     """
     """
     if name is None:
@@ -132,7 +159,7 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
         
         
     # start wandb run
-    with wandb.init(project='lightweight-brain-age-prediction',
+    with wandb.init(project=config['project'],
                     group=config['group'],
                     name=name,
                     tags=tags,
@@ -144,6 +171,8 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
             run.config['shortcut'] = shortcut
         if alpha is not None:
             run.config['alpha'] = alpha
+        run.config['no_0'] = no_0
+        run.config['normalise'] = normalise
         run.config['seed'] = seed
         updated_config = run.config
         
@@ -152,7 +181,8 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
         
         # get data
         X_train, y_train, X_val, y_val, X_test, y_test = access_dataset(schaefer_variant=updated_config.schaefer_variant,
-                                                                        flatten=updated_config.flatten,                                           
+                                                                        no_0=updated_config.no_0,       
+                                                                        normalise=updated_config.normalise,
                                                                         shortcut=updated_config.shortcut,
                                                                         matrix_dir=updated_config.matrix_dir)
         
@@ -163,11 +193,16 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
         # train
         ridge_model.fit(X_train, y_train)
         
-        # test
-        y_pred = ridge_model.predict(X_test)
+        # val
+        y_pred_val = ridge_model.predict(X_val)
+        run.summary['val_mae'] = mean_absolute_error(y_val, y_pred_val)
+        run.summary['val_loss'] = mean_squared_error(y_val, y_pred_val)
+        run.summary['best_val_loss'] = mean_squared_error(y_val, y_pred_val)
         
-        run.summary['test_mae'] = mean_absolute_error(y_test, y_pred)
-        run.summary['test_loss'] = mean_squared_error(y_test, y_pred)
+        # test
+        y_pred_test = ridge_model.predict(X_test)        
+        run.summary['test_mae'] = mean_absolute_error(y_test, y_pred_test)
+        run.summary['test_loss'] = mean_squared_error(y_test, y_pred_test)
         
         
         if plot:
