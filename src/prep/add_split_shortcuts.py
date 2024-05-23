@@ -26,6 +26,10 @@ parser = argparse.ArgumentParser(prog='AddSplitShortcut',
 
 parser.add_argument('--name', type=str, default='100-500p',
                     help='Enter directory name to save under.')
+parser.add_argument('--flatten', type=bool, default=True, 
+                    help='Enter boolean flag whether to save the FC matrices flattened (each FC matrix as 1D array) or not (each a 2D matrix). Default: True.')
+parser.add_argument('--remove_0', type=bool, default=True,
+                    help='Enter boolean flag whether to save additional Xs where the zeros from the matrices are removed. Default: False.')
 parser.add_argument('--datasplit_dir', type=str, default='../../data/schaefer/', 
                     help='Enter path to where the "data_info/" directory is located. This gives information which splits to use (and which IDs to ignore based on the related heldout test set). Default: ../../data/schaefer/')
 parser.add_argument('--variants', nargs='+', default=variants, 
@@ -43,12 +47,25 @@ with h5py.File(save_dir+'schaefer_fc_matrices.hdf5', 'a') as hdf5:
     grp = hdf5.create_group('split_shortcuts/'+args.name)
     for variant in args.variants:
         print(f'Create shortcut for variant {variant}...')
-        X_train, y_train, X_val, y_val, X_test, y_test = sklearn_utils.load_dataset(variant, args.datasplit_dir)
-        grp.create_dataset(variant+'/train/X', data=X_train, compression='gzip', compression_opts=9)
+        print('With 0...')
+        X_train, y_train, X_val, y_val, X_test, y_test = sklearn_utils.load_dataset(schaefer_variant=variant, remove_0=False, 
+                                                                                    flatten=args.flatten, datasplit_dir=args.datasplit_dir)
+        addendum = ''
+        if args.flatten:
+            addendum = '_flattened'
+        grp.create_dataset(variant+'/train/X'+addendum, data=X_train, compression='gzip', compression_opts=9)
         grp.create_dataset(variant+'/train/y', data=y_train, compression='gzip', compression_opts=9)
-        grp.create_dataset(variant+'/val/X', data=X_val, compression='gzip', compression_opts=9)
+        grp.create_dataset(variant+'/val/X'+addendum, data=X_val, compression='gzip', compression_opts=9)
         grp.create_dataset(variant+'/val/y', data=y_val, compression='gzip', compression_opts=9)
-        grp.create_dataset(variant+'/test/X', data=X_test, compression='gzip', compression_opts=9)
+        grp.create_dataset(variant+'/test/X'+addendum, data=X_test, compression='gzip', compression_opts=9)
         grp.create_dataset(variant+'/test/y', data=y_test, compression='gzip', compression_opts=9)
         print('Done.')
+        if args.remove_0:
+            print('Without 0...')
+            X_train, _, X_val, _, X_test, _ = sklearn_utils.load_dataset(schaefer_variant=variant, remove_0=True, 
+                                                                         flatten=True, datasplit_dir=args.datasplit_dir)
+            grp.create_dataset(variant+'/train/X_no-0', data=X_train, compression='gzip', compression_opts=9)
+            grp.create_dataset(variant+'/val/X_no-0', data=X_val, compression='gzip', compression_opts=9)
+            grp.create_dataset(variant+'/test/X_no-0', data=X_test, compression='gzip', compression_opts=9)
+            print('Done.')
         
