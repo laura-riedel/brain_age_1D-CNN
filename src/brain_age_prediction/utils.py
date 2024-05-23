@@ -449,6 +449,26 @@ def get_usable_schaefer_ids(schaefer_data_dir='../../data/schaefer/',
         schaefer_exists_df.drop(schaefer_exists_df[schaefer_exists_df['contains_0_'+variant]==True].index, inplace=True)
     return list(schaefer_exists_df['eid']) 
 
+def get_heldout_schaefer_overview(ukbb_path='/ritter/share/data/UKBB/ukb_data/', 
+                                  schaefer_data_dir='../../data/schaefer/',
+                                  heldout_set_name='heldout_test_set_100-500p.csv'):
+    """
+    Creates an overview of IDs / ages for a specified heldout test set.
+    """
+    heldout_ids = set(np.loadtxt(schaefer_data_dir+heldout_set_name, dtype=int))
+    # get target information (age)
+    age_df = pd.read_csv(ukbb_path+'table/targets/age.tsv', sep='\t', names=['age'])
+    # get subject IDs, rename column 
+    ids_df = pd.read_csv(ukbb_path+'table/ukb_imaging_filtered_eids.txt')
+    ids_df.rename(columns={'f.eid': 'eid'}, inplace=True)
+    # combine information
+    meta_df = pd.concat([ids_df, age_df], axis=1)
+    # keep only held-out IDs
+    meta_df = meta_df[meta_df['eid'].isin(heldout_ids)]
+    # reset index
+    meta_df.reset_index(drop=True, inplace=True)
+    return meta_df
+
 #### OTHER HELPER FUNCTIONS
 def calculate_bag(df, single=False):
     """
