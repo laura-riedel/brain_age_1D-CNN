@@ -28,6 +28,10 @@ parser.add_argument('--shortcut', default=None,
                     help='Enter the data shortcut to use. Defaults to the shortcut in the config.')
 parser.add_argument('--alpha', default=None, 
                     help='Enter the alpha value to use in the Ridge Regression. Defaults to the alpha in the config.')
+parser.add_argument('--no_0', type=bool, default=True, 
+                    help='Enter boolean flag whether to exclude the zeros from the matrices. Default: True.')
+parser.add_argument('--normalise', type=bool, default=True, 
+                    help='Enter boolean flag whether to normalise input before training. Default: True.')
 parser.add_argument('--seed', type=int, default=43, 
                     help='Enter random seed to be used. Default: 43.')
 parser.add_argument('--plot', type=bool, default=False, 
@@ -46,5 +50,7 @@ sklearn_utils.wandb_train_ridge(config,
                                 schaefer_variant=args.schaefer_variant, 
                                 shortcut=args.shortcut, 
                                 alpha=args.alpha, 
+                                no_0=args.no_0,
+                                normalise=args.normalise,
                                 seed=args.seed, 
                                 plot=args.plot)
