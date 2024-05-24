@@ -19,6 +19,7 @@ parameters:
     lr: 0.00020177405202416644
     depth: 1
     start_out: 128
+    scale_dim: True
     stride: 5
     weight_decay: 0.1
     dilation: 1
