@@ -5,7 +5,7 @@ from scipy.stats import zscore
 
 # scikit-learn
 from sklearn.linear_model import Ridge
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # custom module
 from brain_age_prediction import utils
@@ -198,12 +198,13 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
         run.summary['val_mae'] = mean_absolute_error(y_val, y_pred_val)
         run.summary['val_loss'] = mean_squared_error(y_val, y_pred_val)
         run.summary['best_val_loss'] = mean_squared_error(y_val, y_pred_val)
+        run.summary['val_r2'] = r2_score(y_val, y_pred_val)
         
         # test
         y_pred_test = ridge_model.predict(X_test)        
         run.summary['test_mae'] = mean_absolute_error(y_test, y_pred_test)
         run.summary['test_loss'] = mean_squared_error(y_test, y_pred_test)
-        
+        run.summary['test_r2'] = r2_score(y_test, y_pred_test)
         
         if plot:
             wandb.sklearn.plot_regressor(model=ridge_model, 
