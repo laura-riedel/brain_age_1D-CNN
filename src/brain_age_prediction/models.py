@@ -185,7 +185,8 @@ class variable1DCNN(pl.LightningModule):
             # add pooling layer
             if layer == self.depth-1:
                 # average pooling after last conv layer
-                self.encoder.append(nn.AvgPool1d(self.kernel_size, self.stride))
+                # self.encoder.append(nn.AvgPool1d(self.kernel_size, self.stride))
+                self.encoder.append(nn.AdaptiveAvgPool1d(1))
             else:
                 # normally maxpool
                 self.encoder.append(self.maxpool)
