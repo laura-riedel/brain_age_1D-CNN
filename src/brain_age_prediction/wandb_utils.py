@@ -106,7 +106,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         callbacks = [checkpoint, early_stopping]
         # add learning rate monitor if lr is variable
         if lr_scheduler_config_path is not None:
-            lr_monitor = LearningRateMonitor(logging_interval='epoch')
+            lr_monitor = LearningRateMonitor() #logging_interval='epoch'
             callbacks += [lr_monitor]
 
         # initialise trainer
