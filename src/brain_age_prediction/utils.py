@@ -578,5 +578,6 @@ def load_lr_scheduler_config(path, optimizer):
         lr_scheduler_config['scheduler'] = torch.optim.lr_scheduler.OneCycleLR(optimizer=optimizer,
                                                                                max_lr=config['max_lr'],
                                                                                total_steps=config['total_steps'])
+        lr_scheduler_config['interval'] = 'step'
     lr_scheduler_config['name'] = config['scheduler']
     return lr_scheduler_config
