@@ -4,6 +4,7 @@ import os
 import re
 import random
 import logging
+import yaml
 from typing import Any, Dict, Generator, Optional
 from sklearn.linear_model import LinearRegression
 
@@ -537,3 +538,45 @@ def strip_network_names(name, remove_hemisphere=False):
         name = re.sub(pattern_l,'',name)
     name = re.sub(pattern_r,'',name)
     return name
+
+def collect_predictions(predictions):
+    """
+    Collects all batched predictions and their corresponding sub IDs 
+    from CNNs into one concise list each.
+    Input: 
+        predictions: list of tensors 
+            ([[batch 1 [ids], [preds]], [batch 2 [ids], [preds]],...])
+    Output:
+        all_ids: 1D list of all subject IDs
+        all_preds: 1D list of all age predictions
+    """
+    all_ids = []
+    all_preds = []
+    for batch in range(len(predictions)):
+        all_ids += predictions[batch][0].tolist()
+        all_preds += predictions[batch][1].squeeze().tolist()
+    return all_ids, all_preds
+
+def get_true_ys(label_df, ids_list):
+    return [int(label_df.loc[label_df['eid']==id]['age']) for id in ids_list]
+
+def load_lr_scheduler_config(path, optimizer):
+    with open(path, 'r') as f:
+        config = yaml.safe_load(f)
+    lr_scheduler_config = dict()
+    if config['scheduler'] == 'ReduceLROnPlateau':
+        lr_scheduler_config['scheduler'] = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, 
+                                                                                      mode=config['mode'], 
+                                                                                      factor=config['factor'], 
+                                                                                      patience=config['patience'], 
+                                                                                      threshold=config['threshold'], 
+                                                                                      cooldown=config['cooldown'])
+        lr_scheduler_config['interval'] = config['interval']
+        lr_scheduler_config['frequency'] = config['frequency']
+        lr_scheduler_config['monitor'] = config['monitor']
+    elif config['scheduler'] == 'OneCycleLR':
+        lr_scheduler_config['scheduler'] = torch.optim.lr_scheduler.OneCycleLR(optimizer=optimizer,
+                                                                               max_lr=config['max_lr'],
+                                                                               total_steps=config['total_steps'])
+    lr_scheduler_config['name'] = config['scheduler']
+    return lr_scheduler_config
