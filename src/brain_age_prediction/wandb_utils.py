@@ -2,7 +2,7 @@
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 
 # custom module
 from brain_age_prediction import data, models, utils, sklearn_utils
@@ -11,6 +11,7 @@ from brain_age_prediction import data, models, utils, sklearn_utils
 import wandb
 import sys
 import shutil
+from sklearn.metrics import r2_score
 
 ##################################################################################
 # callbacks
@@ -21,7 +22,7 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False, execution='nb'):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, lr_scheduler_config_path=None, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False, execution='nb'):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
@@ -40,6 +41,8 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         max_epochs: for how many epochs the model is supposed to train. Defaults to max_epochs in the config.
         num_threads: if CPU, how many CPU threads to use. Default: 1.
         seed: random seed that is used. Default: 43.
+        lr_scheduler_config_path: path to the config file of a learning rate scheduler, if one wants to use one.
+            Default: None.
         train_ratio: first parameter for train/val/test split regulation. 
             On a scale from 0 to 1, which proportion of data is to be used for training? Default: 0.88.
         val_test_ratio: second parameter for train/val/test split regulation.
@@ -61,6 +64,8 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         name = config['name']
     if tags is None:
         tags = config['tags']
+    if max_epochs is not None:
+        config['parameters']['max_epochs'] = int(max_epochs)
         
     # start wandb run
     with wandb.init(project=config['project'],
@@ -70,8 +75,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                     config=config['parameters']) as run: 
         # update config with additional settings
         run.config['batch_size'] = batch_size
-        if max_epochs is not None:
-            run.config['max_epochs'] = max_epochs
+        
         run.config['dev'] = dev
         run.config['seed'] = seed
         run.config['train_ratio'] = train_ratio
@@ -86,6 +90,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
             torch.set_num_threads(num_threads)
             run.config['accelerator'] = 'cpu'
             devices = 'auto'
+        run.config['lr_scheduler_config_path'] = lr_scheduler_config_path
             
         updated_config = run.config
 
@@ -98,6 +103,11 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         # initialise callbacks
         checkpoint = checkpoint_init()
         early_stopping = utils.earlystopping_init(patience=updated_config.patience)
+        callbacks = [checkpoint, early_stopping]
+        # add learning rate monitor if lr is variable
+        if lr_scheduler_config_path is not None:
+            lr_monitor = LearningRateMonitor(logging_interval='epoch')
+            callbacks += [lr_monitor]
 
         # initialise trainer
         trainer = pl.Trainer(accelerator=updated_config.accelerator, 
@@ -105,7 +115,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                              logger=wandb_logger,
                              log_every_n_steps=updated_config.log_steps,
                              max_epochs=updated_config.max_epochs,
-                             callbacks=[checkpoint, early_stopping],
+                             callbacks=callbacks,
                              deterministic=True)
         
         # depending on dataset modality
@@ -139,7 +149,23 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                                         final_dropout=updated_config.final_dropout,
                                         double_conv=updated_config.double_conv,
                                         batch_norm=updated_config.batch_norm,
-                                        execution=execution) 
+                                        execution=execution,
+                                        lr_scheduler_config_path=updated_config.lr_scheduler_config_path) 
+
+            # model = models.debuggingCNN(in_channels=updated_config.in_channels,
+            #                             kernel_size=updated_config.kernel_size,
+            #                             lr=updated_config.lr,
+            #                             depth=updated_config.depth,
+            #                             start_out=updated_config.start_out,
+            #                             scale_dim=updated_config.scale_dim,
+            #                             stride=updated_config.stride,
+            #                             weight_decay=updated_config.weight_decay,
+            #                             conv_dropout=updated_config.conv_dropout,
+            #                             final_dropout=updated_config.final_dropout,
+            #                             double_conv=updated_config.double_conv,
+            #                             batch_norm=updated_config.batch_norm,
+            #                             execution=execution,
+            #                             lr_scheduler_config_path=updated_config.lr_scheduler_config_path) 
 
         # train model
         trainer.fit(model, datamodule=datamodule)
@@ -159,8 +185,22 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
             # remove local data_info directory
             shutil.rmtree('data_info')
         
+        # test model
         if test:
             trainer.test(ckpt_path='best', datamodule=datamodule)
+
+        # R2
+        y_pred_val = trainer.predict(model, 
+                                     dataloaders=datamodule.general_dataloader(datamodule.data,datamodule.predict_sampler_val),
+                                     ckpt_path='best')
+        y_pred_test = trainer.predict(model, 
+                                      dataloaders=datamodule.general_dataloader(datamodule.data,datamodule.predict_sampler_test),
+                                      ckpt_path='best')
+        val_ids_list, y_pred_val_list = utils.collect_predictions(y_pred_val)
+        test_ids_list, y_pred_test_list = utils.collect_predictions(y_pred_test)
+
+        run.summary['val_r2'] = r2_score(utils.get_true_ys(datamodule.data.labels,val_ids_list), y_pred_val_list)
+        run.summary['test_r2'] = r2_score(utils.get_true_ys(datamodule.data.labels,test_ids_list), y_pred_test_list)
         
         if not finish:
             # return trainer instance + datamodule

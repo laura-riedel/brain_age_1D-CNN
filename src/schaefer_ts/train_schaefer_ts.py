@@ -36,6 +36,8 @@ parser.add_argument('--num_threads', type=int, default=2,
                     help='If use_gpu=False, enter how many CPU threads to use. Default: 2.')
 parser.add_argument('--seed', type=int, default=43, 
                     help='Enter random seed to be used. Default: 43.')
+parser.add_argument('-lr_config_path','--lr_scheduler_config_path', default=None,
+                    help='Enter the path to the learning rate scheduler config, if applicable. Default: None.')
 parser.add_argument('--train_ratio', type=float, default=0.88, 
                     help='Enter first parameter for train/val/test split regulation. On a scale from 0 to 1, which proportion of data is to be used for training? Default: 0.88.')
 parser.add_argument('--val_test_ratio', type=bool, default=0.5, 
@@ -56,6 +58,8 @@ args = parser.parse_args()
 # load config
 with open(args.config_path, 'r') as f:
     config = yaml.safe_load(f)
+# with open(args.lr_scheduler_config_path, 'r') as f:
+#     lr_scheduler_config = yaml.safe_load(f)
 
 # train
 wandb_utils.wandb_train(config, 
@@ -68,6 +72,7 @@ wandb_utils.wandb_train(config,
                         max_epochs=args.max_epochs, 
                         num_threads=args.num_threads, 
                         seed=args.seed, 
+                        lr_scheduler_config_path=args.lr_scheduler_config_path,
                         train_ratio=args.train_ratio, 
                         val_test_ratio=args.val_test_ratio, 
                         save_datasplit=args.save_datasplit, 
