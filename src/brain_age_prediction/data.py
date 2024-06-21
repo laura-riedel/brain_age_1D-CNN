@@ -316,11 +316,15 @@ class UKBBDataModule(pl.LightningDataModule):
             self.train_sampler = SubsetRandomSampler(self.train_idx, generator=self.g)
             self.val_sampler = SubsetRandomSampler(self.val_idx, generator=self.g)
             self.test_sampler = SubsetRandomSampler(self.test_idx, generator=self.g)
-            self.predict_sampler = SubsetRandomSampler(self.val_idx+self.test_idx, generator=self.g)
+            # self.predict_sampler = SubsetRandomSampler(self.val_idx+self.test_idx, generator=self.g)
+            self.predict_sampler_full = SubsetRandomSampler(self.val_idx+self.test_idx, generator=self.g)
+            self.predict_sampler_val = SubsetRandomSampler(self.val_idx, generator=self.g)
+            self.predict_sampler_test = SubsetRandomSampler(self.test_idx, generator=self.g)
         # final testing phase
         else:
             self.test_sampler = SubsetRandomSampler(indices, generator=self.g)
-            self.predict_sampler = SubsetRandomSampler(indices, generator=self.g)
+            self.predict_sampler_full = SubsetRandomSampler(indices, generator=self.g)
+            
     
     def general_dataloader(self, data_part, data_sampler):
         data_loader = DataLoader(
@@ -345,4 +349,6 @@ class UKBBDataModule(pl.LightningDataModule):
         return self.general_dataloader(self.data, self.test_sampler)
     
     def predict_dataloader(self):
-        return self.general_dataloader(self.data, self.predict_sampler)
+        # return self.general_dataloader(self.data, self.predict_sampler)
+        return self.general_dataloader(self.data, self.predict_sampler_full)
+    
