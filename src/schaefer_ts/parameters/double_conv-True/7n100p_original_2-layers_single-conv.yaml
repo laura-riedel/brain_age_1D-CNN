@@ -1,0 +1,29 @@
+project: 'lightweight-brain-age-prediction'
+group: 'schaefer_ts'
+name: '7n100p_original_2-layers_single-conv'
+tags: ['7n','100p', '2 layers', ]
+parameters:
+    # dataset set-up
+    schaefer_variant: '7n100p'
+    corr_matrix: False
+    shared_variants: ['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p']
+    additional_data_path: '../../data/schaefer/'
+    heldout_set_name: 'heldout_test_set_100-500p.csv'
+    # training set-up
+    max_epochs: 175
+    log_steps: 50
+    patience: 15
+    # model parameters
+    in_channels: 100
+    kernel_size: 9
+    lr: 0.00020177405202416644
+    depth: 2
+    start_out: 128
+    scale_dim: True
+    stride: 5
+    weight_decay: 0.1
+    dilation: 1
+    conv_dropout: 0
+    final_dropout: 0
+    double_conv: False
+    batch_norm: True

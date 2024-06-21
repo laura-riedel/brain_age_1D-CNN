@@ -1,0 +1,3 @@
+scheduler: 'OneCycleLR'
+max_lr: 0.00001
+total_steps: 50000

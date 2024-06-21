@@ -1,0 +1,9 @@
+scheduler: 'ReduceLROnPlateau'
+mode: 'min'
+factor: 0.5
+patience: 7
+threshold: 0.0001
+cooldown: 0
+interval: 'epoch'
+frequency: 1
+monitor: 'val_loss'
