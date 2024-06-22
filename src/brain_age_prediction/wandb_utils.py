@@ -22,7 +22,9 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, num_threads=1, seed=43, lr_scheduler_config_path=None, train_ratio=0.88, val_test_ratio=0.5, save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False, execution='nb'):
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, 
+                num_threads=1, seed=43, lr_scheduler_config_path=None, train_ratio=0.88, val_test_ratio=0.5, 
+                save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False, execution='nb'):
     """
     Function for training a model in a notebook using external config information. Logs to W&B.
     Optional trained model + datamodule output.
