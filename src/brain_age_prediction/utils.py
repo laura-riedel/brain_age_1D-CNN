@@ -15,12 +15,12 @@ from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 # import data + model modules
-from brain_age_prediction import data
-from brain_age_prediction import models
+from brain_age_prediction import data, models, plotting
 
 # visualisation
 import matplotlib.pyplot as plt
 import seaborn as sns
+from IPython.display import display
 
 ##################################################################################
 ### SAVING THINGS
@@ -157,7 +157,7 @@ def train_model(log_path, data_path, config, device, execution='nb'):
     Outputs a trained model.
     Input:
         log_path: path to where logs, checkpoints and data info should be saved
-        data_path: path to location where data is saved (expectations see ukbb_data.DataModule)
+        data_path: path to location where data is saved (expectations see data.DataModule)
         config: configuration dictionary of the form 
                 {'project': '', 'model': '', 'parameters': {all parameters except for execution}}
         device: which GPU to run on
@@ -171,7 +171,7 @@ def train_model(log_path, data_path, config, device, execution='nb'):
     full_log_path = log_path+config['project']+'/'+config['model']+'/'
     
     # initialise model
-    variable_CNN = ukbb_ica_models.variable1DCNN(in_channels=config['parameters']['in_channels'],
+    variable_CNN = models.variable1DCNN(in_channels=config['parameters']['in_channels'],
                                                 kernel_size=config['parameters']['kernel_size'],
                                                 lr=config['parameters']['lr'],
                                                 depth=config['parameters']['depth'],
@@ -201,7 +201,7 @@ def train_model(log_path, data_path, config, device, execution='nb'):
                                 callbacks=[early_stopping, checkpoint])
 
     # initialise DataModule
-    datamodule = ukbb_data.UKBBDataModule(data_path,
+    datamodule = data.UKBBDataModule(data_path,
                                          ica=config['parameters']['ica'],
                                          good_components=config['parameters']['good_components'])
 
@@ -269,7 +269,7 @@ def test_model(trainer, datamodule, config):
     # visualise training
     print(f'\nVisualise training of model "{model_info}" {data_info}...')    
     metrics = get_current_metrics(trainer, show=True)
-    plot_training(data=metrics, title=f'Training visualisation of the ICA{ica_info} 1D-CNN with {gc} {data_info}.')
+    plotting.plot_training(data=metrics, title=f'Training visualisation of the ICA{ica_info} 1D-CNN with {gc} {data_info}.')
 
 #### LOADING DATA
 def get_current_metrics(trainer, show=False):
@@ -561,6 +561,7 @@ def get_true_ys(label_df, ids_list):
     return [int(label_df.loc[label_df['eid']==id]['age']) for id in ids_list]
 
 def load_lr_scheduler_config(path, optimizer):
+    make_reproducible()
     with open(path, 'r') as f:
         config = yaml.safe_load(f)
     lr_scheduler_config = dict()
@@ -571,13 +572,12 @@ def load_lr_scheduler_config(path, optimizer):
                                                                                       patience=config['patience'], 
                                                                                       threshold=config['threshold'], 
                                                                                       cooldown=config['cooldown'])
-        lr_scheduler_config['interval'] = config['interval']
-        lr_scheduler_config['frequency'] = config['frequency']
-        lr_scheduler_config['monitor'] = config['monitor']
     elif config['scheduler'] == 'OneCycleLR':
         lr_scheduler_config['scheduler'] = torch.optim.lr_scheduler.OneCycleLR(optimizer=optimizer,
                                                                                max_lr=config['max_lr'],
                                                                                total_steps=config['total_steps'])
-        lr_scheduler_config['interval'] = 'step'
+    lr_scheduler_config['interval'] = config['interval']
+    lr_scheduler_config['frequency'] = config['frequency']
+    lr_scheduler_config['monitor'] = config['monitor']
     lr_scheduler_config['name'] = config['scheduler']
     return lr_scheduler_config

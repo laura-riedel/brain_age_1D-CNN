@@ -1,3 +1,6 @@
 scheduler: 'OneCycleLR'
 # max_lr: 10e-2,3,4,5,6
 total_steps: 25000 #50000
+interval: 'step'
+frequency: 1
+monitor: 'val_loss'
