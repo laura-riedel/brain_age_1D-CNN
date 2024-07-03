@@ -1,7 +1,9 @@
+import re
 import numpy as np
 import wandb
 import h5py
 from scipy.stats import zscore
+from sklearn.decomposition import IncrementalPCA
 
 # scikit-learn
 from sklearn.linear_model import Ridge
@@ -11,6 +13,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from brain_age_prediction import utils
 
 ##################################################################################
+# DATA ACCESSING / LOADING
 def load_matrix(sub_id, schaefer_variant, remove_0=False, flatten=False,
                 matrix_dir='/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'):
     """
@@ -27,7 +30,7 @@ def load_matrix(sub_id, schaefer_variant, remove_0=False, flatten=False,
     return matrix
 
 def load_datasplit(split, schaefer_variant, remove_0=False, flatten=False, normalise=False,
-                   datasplit_dir='../../data/schaefer/', 
+                   datasplit_dir='../../data/schaefer/',
                    matrix_dir='/ritter/share/projects/laura_riedel_thesis/schaefer_fc_matrices.hdf5'):
     """
     Loads specified data split of specified Schaefer variant from HDF5 file and 
@@ -147,17 +150,35 @@ def access_dataset(schaefer_variant, no_0=False, normalise=False, shortcut='100-
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 ##################################################################################
-# W&B training / testing
-
-def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, shortcut=None, alpha=None, no_0=None, normalise=None, seed=43, plot=True):
+# PCA
+def fit_transform_IPCA(X_train, X_val, X_test, n_components=500, incremental_batch_size=2500):
     """
+    Takes the datasets of FC matrices, performs an incremental PCA on the training data
+    and transforms the validation and test data.
+    """
+    utils.make_reproducible()
+
+    ipca = IncrementalPCA(n_components=n_components, batch_size=incremental_batch_size)
+    X_train_ipca = ipca.fit_transform(X_train)
+    X_val_ipca = ipca.transform(X_val)
+    X_test_ipca = ipca.transform(X_test)
+    return X_train_ipca, X_val_ipca, X_test_ipca
+
+##################################################################################
+# W&B TRAINING / TESTING
+
+def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, shortcut=None,
+                      alpha=None, no_0=None, normalise=None, ipca=False, n_components=500,
+                      incremental_batch_size=2500, seed=43, plot=True):
+    """
+    Function for training a model with Schaefer FC matrices using external config
+    information. Logs to W&B. Optional plot generation.
     """
     if name is None:
         name = config['name']
     if tags is None:
         tags = config['tags']
-        
-        
+
     # start wandb run
     with wandb.init(project=config['project'],
                     group=config['group'],
@@ -173,6 +194,10 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
             run.config['alpha'] = alpha
         run.config['no_0'] = no_0
         run.config['normalise'] = normalise
+        run.config['ipca'] = ipca
+        if ipca:
+            run.config['n_components'] = n_components
+            run.config['incremental_batch_size'] = incremental_batch_size
         run.config['seed'] = seed
         updated_config = run.config
         
@@ -181,13 +206,17 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
         
         # get data
         X_train, y_train, X_val, y_val, X_test, y_test = access_dataset(schaefer_variant=updated_config.schaefer_variant,
-                                                                        no_0=updated_config.no_0,       
+                                                                        no_0=updated_config.no_0,
                                                                         normalise=updated_config.normalise,
                                                                         shortcut=updated_config.shortcut,
                                                                         matrix_dir=updated_config.matrix_dir)
-        
+        if ipca:
+            X_train, X_val, X_test = fit_transform_IPCA(X_train, X_val, X_test,
+                                                        updated_config['n_components'],
+                                                        updated_config['incremental_batch_size'])
+
         # define model
-        ridge_model = Ridge(alpha=updated_config.alpha, 
+        ridge_model = Ridge(alpha=updated_config.alpha,
                             random_state=updated_config.seed)
         
         # train
@@ -201,17 +230,17 @@ def wandb_train_ridge(config, name=None, tags=None, schaefer_variant=None, short
         run.summary['val_r2'] = r2_score(y_val, y_pred_val)
         
         # test
-        y_pred_test = ridge_model.predict(X_test)        
+        y_pred_test = ridge_model.predict(X_test)
         run.summary['test_mae'] = mean_absolute_error(y_test, y_pred_test)
         run.summary['test_loss'] = mean_squared_error(y_test, y_pred_test)
         run.summary['test_r2'] = r2_score(y_test, y_pred_test)
         
         if plot:
-            wandb.sklearn.plot_regressor(model=ridge_model, 
-                                         X_train=X_train, 
-                                         X_test=X_test, 
-                                         y_train=y_train, 
-                                         y_test=y_test, 
+            wandb.sklearn.plot_regressor(model=ridge_model,
+                                         X_train=X_train,
+                                         X_test=X_test,
+                                         y_train=y_train,
+                                         y_test=y_test,
                                          model_name=name)
         
         
