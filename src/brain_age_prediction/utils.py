@@ -5,7 +5,7 @@ import re
 import random
 import logging
 import yaml
-from typing import Any, Dict, Generator, Optional
+from typing import Optional
 from sklearn.linear_model import LinearRegression
 
 # Pytorch etc
