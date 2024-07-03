@@ -102,7 +102,7 @@ class UKBB_ICA_ts(Dataset):
         timeseries = timeseries.float()
         label = torch.tensor(label)
         label = label.float()
-        return timeseries, label, sub_id        
+        return timeseries, label, sub_id
 
 class UKBB_Schaefer_ts(Dataset):
     """
@@ -125,7 +125,11 @@ class UKBB_Schaefer_ts(Dataset):
         dev: boolean flag to indicate whether model training/testing is still in the development phase. If True,
             held-out IDs are dropped from meta_df, if False, only held-out IDs are kept. Default: True.
     """
-    def __init__(self, data_path, schaefer_variant='7n100p', shared_variants=['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p'], corr_matrix=False, corr_kind='pearson', additional_data_path='../../data/schaefer/', heldout_set_name='heldout_test_set_100-500p.csv', all_data=True, dev=True):
+    def __init__(self, data_path, schaefer_variant='7n100p',
+                 shared_variants=['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p'],
+                 corr_matrix=False, corr_kind='pearson',
+                 additional_data_path='../../data/schaefer/', heldout_set_name='heldout_test_set_100-500p.csv',
+                 all_data=True, dev=True):
         # save data path + settings
         self.data_path = data_path
         self.schaefer_variant = schaefer_variant
@@ -185,7 +189,7 @@ class UKBB_Schaefer_ts(Dataset):
         #label = torch.tensor(label)
         #return data.float(), label.float()
     
-    def __getitem__(self, sub_id):       
+    def __getitem__(self, sub_id):
         # get label (age)
         label = self.labels.loc[self.labels['eid'] == sub_id, 'age'].values[0]
         # get filname/path to timeseries
@@ -193,7 +197,7 @@ class UKBB_Schaefer_ts(Dataset):
         
         # load + standardise timeseries
         # don't include the first column that names the networks/parcellations 
-        timeseries = np.loadtxt(ts_path, skiprows=1, usecols=tuple([i for i in range(1,491)]), delimiter=',') 
+        timeseries = np.loadtxt(ts_path, skiprows=1, usecols=tuple([i for i in range(1,491)]), delimiter=',')
         # standardise each component's timeseries
         timeseries = zscore(timeseries, axis=1)
         
@@ -202,7 +206,7 @@ class UKBB_Schaefer_ts(Dataset):
             if self.corr_kind == 'pearson':
                 correlation_matrix = np.corrcoef(timeseries)
             else:
-                raise NameError(f"Correlation kind {self.corr_kind} is not defined")        
+                raise NameError(f"Correlation kind {self.corr_kind} is not defined")
             # turn data into tensors
             #model_input, label = self.to_tensor(correlation_matrix, label)
             correlation_matrix = torch.from_numpy(correlation_matrix)
@@ -254,12 +258,12 @@ class UKBBDataModule(pl.LightningDataModule):
             validating/testing? >0.5: more data for validation; <0.5: more data for testing. Default: 0.5.
     """
     def __init__(self, dataset_type='UKBB_Schaefer_ts', data_path='/ritter/share/data/UKBB/ukb_data/',
-                 ica='25', good_components=False, 
+                 ica='25', good_components=False,
                  schaefer_variant='7n100p', shared_variants=['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p'],
                  corr_matrix=False, corr_kind='pearson',
-                 additional_data_path='../../data/schaefer/', heldout_set_name='heldout_test_set_100-500p.csv', 
-                 all_data=True, dev=True, 
-                 batch_size=128, seed=43, train_ratio=0.8, val_test_ratio=0.5): 
+                 additional_data_path='../../data/schaefer/', heldout_set_name='heldout_test_set_100-500p.csv',
+                 all_data=True, dev=True,
+                 batch_size=128, seed=43, train_ratio=0.8, val_test_ratio=0.5):
         super().__init__()
         self.save_hyperparameters()
         self.data_path = data_path
@@ -292,12 +296,12 @@ class UKBBDataModule(pl.LightningDataModule):
         # runs on all GPUs
         # load data
         if self.dataset_type == 'UKBB_ICA_ts':
-            self.data = UKBB_ICA_ts(self.data_path, self.ica, self.good_components, self.all_data) 
+            self.data = UKBB_ICA_ts(self.data_path, self.ica, self.good_components, self.all_data)
         elif self.dataset_type == 'UKBB_Schaefer_ts':
             self.data = UKBB_Schaefer_ts(self.data_path, self.schaefer_variant, self.shared_variants, self.corr_matrix, self.corr_kind, self.additional_data_path, self.heldout_set_name, self.all_data, self.dev) 
 
         dataset_size = self.data.labels['eid'].shape[0]
-        indices = list(self.data.labels['eid'])  
+        indices = list(self.data.labels['eid'])
             
         # development phase
         if self.dev:
