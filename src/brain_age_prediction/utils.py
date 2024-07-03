@@ -1,11 +1,12 @@
-import pandas as pd
-import numpy as np
 import os
 import re
 import random
 import logging
-import yaml
 from typing import Optional
+import yaml
+import pandas as pd
+import numpy as np
+
 from sklearn.linear_model import LinearRegression
 
 # Pytorch etc
@@ -13,14 +14,15 @@ import torch
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-
-# import data + model modules
-from brain_age_prediction import data, models, plotting
+from pytorch_lightning.utilities.rank_zero import rank_zero_warn
 
 # visualisation
 import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython.display import display
+
+# import data + model modules
+from brain_age_prediction import data, models, plotting
 
 ##################################################################################
 ### SAVING THINGS
@@ -62,10 +64,14 @@ def make_reproducible(random_state=43):
     torch.backends.cudnn.deterministic = True
     torch.cuda.manual_seed(random_state)
 
-# copy seed_everything function provided in Lightning vers. 1.6.3 that is not 
-# available anymore in 2.0.2 from 
+# copy _select_seed_randomly and seed_everything function provided in Lightning vers. 1.6.3
+# that is not available anymore in 2.0.2 from 
 # https://pytorch-lightning.readthedocs.io/en/1.6.3/_modules/pytorch_lightning/utilities/seed.html#seed_everything
 log = logging.getLogger(__name__)
+
+def _select_seed_randomly(min_seed_value: int = 0, max_seed_value: int = 255) -> int:
+    return random.randint(min_seed_value, max_seed_value)
+
 def seed_everything(seed: Optional[int] = None, workers: bool = False) -> int:
     """Function that sets seed for pseudo-random number generators in: pytorch, numpy, python.random In addition,
     sets the following environment variables:
@@ -267,7 +273,7 @@ def test_model(trainer, datamodule, config):
     trainer.test(ckpt_path='best', datamodule=datamodule)
     
     # visualise training
-    print(f'\nVisualise training of model "{model_info}" {data_info}...')    
+    print(f'\nVisualise training of model "{model_info}" {data_info}...')
     metrics = get_current_metrics(trainer, show=True)
     plotting.plot_training(data=metrics, title=f'Training visualisation of the ICA{ica_info} 1D-CNN with {gc} {data_info}.')
 
