@@ -27,37 +27,23 @@ for alpha in np.logspace(-5,5,20):
     print(f'>> {alpha}')
     updated_tags = config['tags']+[f'alpha {alpha}']
     updated_name = config['name']+'-'+str(alpha)
-    print('- no 0, normalised')
-    sklearn_utils.wandb_train_ridge(config, 
-                                    name=updated_name, 
+    print('- no 0, normalised, all features')
+    sklearn_utils.wandb_train_ridge(config,
+                                    name=updated_name,
                                     tags=updated_tags+['no 0', 'normalised'],
-                                    alpha=alpha,  
+                                    alpha=alpha,
                                     no_0=True,
                                     normalise=True,
+                                    ipca=False,
                                     plot=False)
-    print('- no 0, not normalised')
-    sklearn_utils.wandb_train_ridge(config, 
-                                    name=updated_name, 
-                                    tags=updated_tags+['no 0'],
-                                    alpha=alpha,  
+    print('- no 0, normalised, PCA 500')
+    sklearn_utils.wandb_train_ridge(config,
+                                    name=updated_name,
+                                    tags=updated_tags+['no 0', 'normalised', 'pca'],
+                                    alpha=alpha,
                                     no_0=True,
-                                    normalise=False,
-                                    plot=False)
-    print('- with 0, normalised')
-    sklearn_utils.wandb_train_ridge(config, 
-                                    name=updated_name, 
-                                    tags=updated_tags+['with 0', 'normalised'],
-                                    alpha=alpha,  
-                                    no_0=False,
                                     normalise=True,
-                                    plot=False)
-    print('- with 0, not normalised')
-    sklearn_utils.wandb_train_ridge(config, 
-                                    name=updated_name, 
-                                    tags=updated_tags+['with 0'],
-                                    alpha=alpha,  
-                                    no_0=False,
-                                    normalise=False,
+                                    ipca=True,
                                     plot=False)
     print('\n')
 print('DONE.')
