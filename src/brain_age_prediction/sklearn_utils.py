@@ -1,4 +1,3 @@
-import re
 import numpy as np
 import wandb
 import h5py
@@ -59,7 +58,7 @@ def load_datasplit(split, schaefer_variant, remove_0=False, flatten=False, norma
     # stack all subject FC matrices in one array
     X = np.stack([load_matrix(sub_id,schaefer_variant,remove_0,flatten,matrix_dir) for sub_id in sub_ids])
     if normalise:
-        X = zscore(X, axis=1)
+        X = zscore(X, axis=0)
     return X, y
 
 def load_dataset(schaefer_variant, remove_0=False, flatten=False, normalise=False,
@@ -119,7 +118,7 @@ def access_datasplit(split, schaefer_variant, no_0=False, normalise=False, short
         X = f['split_shortcuts'][shortcut][schaefer_variant][split]['X'+addendum][()]
         y = f['split_shortcuts'][shortcut][schaefer_variant][split]['y'][()]
         if normalise:
-            X = zscore(X, axis=1)
+            X = zscore(X, axis=0)
     return X, y
 
 def access_dataset(schaefer_variant, no_0=False, normalise=False, shortcut='100-500p',
