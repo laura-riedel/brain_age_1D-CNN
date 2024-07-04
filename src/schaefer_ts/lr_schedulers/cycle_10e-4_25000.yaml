@@ -1,5 +1,5 @@
 scheduler: 'OneCycleLR'
-max_lr: 0.001
+max_lr: 0.0001
 total_steps: 25000 
 interval: 'step'
 frequency: 1
