@@ -109,6 +109,9 @@ class variable1DCNN(pl.LightningModule):
                     Default: 32.
         scale_dim: boolean flag determining whether start_out dimensionality will be scaled up. 
                     Default: True.
+        scale_after_conv: boolean flag determining whether to scale after each conv layer (=True)
+                    or after each layer (=False). Only relevant when scale_dim=True & double_conv=True.
+                    Default: False.
         stride: stride for MaxPool layers.
         weight_decay: weight decay for optimiser.
         dilation: spacing between the kernel points.
@@ -123,10 +126,10 @@ class variable1DCNN(pl.LightningModule):
     Output:
         A model.
     """
-    def __init__(self, in_channels=25, kernel_size=5, activation=nn.ReLU(), loss=nn.MSELoss(), 
-                 lr=1e-3, depth=4, start_out=32, scale_dim=True, stride=2, weight_decay=0, dilation=1,
-                 conv_dropout=0, final_dropout=0, double_conv=False, batch_norm=False, execution='nb',
-                 lr_scheduler_config_path=None):
+    def __init__(self, in_channels=25, kernel_size=5, activation=nn.ReLU(), loss=nn.MSELoss(),
+                 lr=1e-3, depth=4, start_out=32, scale_dim=True, scale_after_conv=False, stride=2,
+                 weight_decay=0, dilation=1, conv_dropout=0, final_dropout=0, double_conv=False,
+                 batch_norm=False, execution='nb', lr_scheduler_config_path=None):
         super().__init__()
         self.in_channels = in_channels
         self.kernel_size = kernel_size
@@ -136,6 +139,7 @@ class variable1DCNN(pl.LightningModule):
         self.depth = depth
         self.start_out = start_out
         self.scale_dim = scale_dim
+        self.scale_after_conv = scale_after_conv
         self.stride = stride
         self.conv_dropout = conv_dropout
         self.final_dropout = final_dropout
@@ -170,7 +174,7 @@ class variable1DCNN(pl.LightningModule):
                 self.add_conv_layer(self.in_channels, channel)
             # all other layers
             else:
-                if scale_dim:
+                if self.scale_dim:
                     new_channel = channel*2
                 else:
                     new_channel = channel
@@ -179,7 +183,7 @@ class variable1DCNN(pl.LightningModule):
                 channel = new_channel
             # add second conv layer if flag = True (complete with activation (+ BatchNorm + dropout))
             if self.double_conv:
-                if scale_dim:
+                if self.scale_dim and self.scale_after_conv:
                     new_channel = channel*2
                 else:
                     new_channel = channel
