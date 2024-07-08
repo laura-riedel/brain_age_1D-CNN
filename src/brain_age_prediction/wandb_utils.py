@@ -4,15 +4,15 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 
-# custom module
-from brain_age_prediction import data, models, utils, sklearn_utils
-
 # other
 import wandb
 import sys
 import shutil
 from sklearn.metrics import r2_score
 import yaml
+
+# custom module
+from brain_age_prediction import data, models, utils
 
 ##################################################################################
 # callbacks
@@ -23,11 +23,11 @@ def checkpoint_init():
     return checkpoint
 
 # training a model
-def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None, 
-                num_threads=1, seed=43, lr_scheduler_config_path=None, train_ratio=0.88, val_test_ratio=0.5, 
+def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=True, batch_size=128, max_epochs=None,
+                num_threads=1, seed=43, lr_scheduler_config_path=None, train_ratio=0.88, val_test_ratio=0.5,
                 save_datasplit=True, save_overview=False, all_data=True, test=False, finish=False, execution='nb'):
     """
-    Function for training a model in a notebook using external config information. Logs to W&B.
+    Function for training a model with Schaefer timeseries using external config information. Logs to W&B.
     Optional trained model + datamodule output.
     Input:
         config: configuration dictionary containing meta information and parameters for 
@@ -74,13 +74,30 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         name = config['name']
     if tags is None:
         tags = config['tags']
+
+    # initialise DataModule
+    datamodule = data.UKBBDataModule(data_path='/ritter/share/data/UKBB/ukb_data/',
+                                        dataset_type='UKBB_Schaefer_ts',
+                                        schaefer_variant=config['parameters']['schaefer_variant'],
+                                        corr_matrix=config['parameters']['corr_matrix'],
+                                        shared_variants=config['parameters']['shared_variants'],
+                                        additional_data_path=config['parameters']['additional_data_path'],
+                                        heldout_set_name=config['parameters']['heldout_set_name'],
+                                        all_data=all_data,
+                                        dev=dev,
+                                        batch_size=batch_size,
+                                        seed=seed,
+                                        train_ratio=train_ratio,
+                                        val_test_ratio=val_test_ratio)
+
     if max_epochs is not None:
         config['parameters']['max_epochs'] = int(max_epochs)
+    # determine max_epochs for OneCycleLR
     elif lr_scheduler_config_path is not None and prelim_lr_config['scheduler'] == 'OneCycleLR':
-        config['parameters']['max_epochs'] = 300
-        
-        
-    # start wandb run   
+        datamodule.setup()
+        config['parameters']['max_epochs'] = prelim_lr_config['total_steps']//len(datamodule.train_dataloader())
+
+    # start wandb run
     # make sure no previous run is recycled
     wandb.finish()
     # initialise logger
@@ -88,7 +105,7 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
                                 group=config['group'],
                                 name=name,
                                 tags=tags,
-                                config=config['parameters'], 
+                                config=config['parameters'],
                                 log_model='all')
 
     # update config with additional settings
@@ -128,67 +145,50 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
     else:
         callbacks += [early_stopping]
 
+    # initialise variable1DCNN model
+    model = models.variable1DCNN(in_channels=updated_config.in_channels,
+                                kernel_size=updated_config.kernel_size,
+                                lr=updated_config.lr,
+                                depth=updated_config.depth,
+                                start_out=updated_config.start_out,
+                                scale_dim=updated_config.scale_dim,
+                                scale_after_conv=updated_config.scale_after_conv,
+                                stride=updated_config.stride,
+                                weight_decay=updated_config.weight_decay,
+                                conv_dropout=updated_config.conv_dropout,
+                                final_dropout=updated_config.final_dropout,
+                                double_conv=updated_config.double_conv,
+                                batch_norm=updated_config.batch_norm,
+                                execution=execution,
+                                lr_scheduler_config_path=updated_config.lr_scheduler_config_path)
+
+    # model = models.debuggingCNN(in_channels=updated_config.in_channels,
+    #                             kernel_size=updated_config.kernel_size,
+    #                             lr=updated_config.lr,
+    #                             depth=updated_config.depth,
+    #                             start_out=updated_config.start_out,
+    #                             scale_dim=updated_config.scale_dim,
+    #                             stride=updated_config.stride,
+    #                             weight_decay=updated_config.weight_decay,
+    #                             conv_dropout=updated_config.conv_dropout,
+    #                             final_dropout=updated_config.final_dropout,
+    #                             double_conv=updated_config.double_conv,
+    #                             batch_norm=updated_config.batch_norm,
+    #                             execution=execution,
+    #                             lr_scheduler_config_path=updated_config.lr_scheduler_config_path)
+
     # initialise trainer
-    trainer = pl.Trainer(accelerator=updated_config.accelerator, 
+    trainer = pl.Trainer(accelerator=updated_config.accelerator,
                             devices=devices,
                             logger=wandb_logger,
                             log_every_n_steps=updated_config.log_steps,
                             max_epochs=updated_config.max_epochs,
                             callbacks=callbacks,
                             deterministic=True)
-    
-    # depending on dataset modality
-    if config['group'] == 'schaefer_ts':
-        # initialise DataModule
-        datamodule = data.UKBBDataModule(data_path='/ritter/share/data/UKBB/ukb_data/',
-                                            dataset_type='UKBB_Schaefer_ts',
-                                            schaefer_variant=updated_config.schaefer_variant,
-                                            corr_matrix=updated_config.corr_matrix,
-                                            shared_variants=updated_config.shared_variants,
-                                            additional_data_path=updated_config.additional_data_path,
-                                            heldout_set_name=updated_config.heldout_set_name,
-                                            all_data=updated_config.all_data,
-                                            dev=updated_config.dev,
-                                            batch_size=updated_config.batch_size, 
-                                            seed=updated_config.seed, 
-                                            train_ratio=updated_config.train_ratio, 
-                                            val_test_ratio=updated_config.val_test_ratio,
-                                        )
-    
-        # initialise variable1DCNN model
-        model = models.variable1DCNN(in_channels=updated_config.in_channels,
-                                    kernel_size=updated_config.kernel_size,
-                                    lr=updated_config.lr,
-                                    depth=updated_config.depth,
-                                    start_out=updated_config.start_out,
-                                    scale_dim=updated_config.scale_dim,
-                                    stride=updated_config.stride,
-                                    weight_decay=updated_config.weight_decay,
-                                    conv_dropout=updated_config.conv_dropout,
-                                    final_dropout=updated_config.final_dropout,
-                                    double_conv=updated_config.double_conv,
-                                    batch_norm=updated_config.batch_norm,
-                                    execution=execution,
-                                    lr_scheduler_config_path=updated_config.lr_scheduler_config_path) 
-
-        # model = models.debuggingCNN(in_channels=updated_config.in_channels,
-        #                             kernel_size=updated_config.kernel_size,
-        #                             lr=updated_config.lr,
-        #                             depth=updated_config.depth,
-        #                             start_out=updated_config.start_out,
-        #                             scale_dim=updated_config.scale_dim,
-        #                             stride=updated_config.stride,
-        #                             weight_decay=updated_config.weight_decay,
-        #                             conv_dropout=updated_config.conv_dropout,
-        #                             final_dropout=updated_config.final_dropout,
-        #                             double_conv=updated_config.double_conv,
-        #                             batch_norm=updated_config.batch_norm,
-        #                             execution=execution,
-        #                             lr_scheduler_config_path=updated_config.lr_scheduler_config_path) 
 
     # train model
     trainer.fit(model, datamodule=datamodule)
-    
+
     if save_datasplit:
         # take note of applied data split
         # create a local data_info directory (with or without overview)
@@ -200,19 +200,19 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
         split_artifact = wandb.Artifact(name='split_indices', type='dataset')
         split_artifact.add_dir('data_info')
         # finalise artifact
-        wandb.finish_artifact(split_artifact)
+        wandb.log_artifact(split_artifact)
         # remove local data_info directory
         shutil.rmtree('data_info')
-    
+
     # test model
     if test:
         trainer.test(ckpt_path='best', datamodule=datamodule)
 
     # R2
-    y_pred_val = trainer.predict(model, 
+    y_pred_val = trainer.predict(model,
                                  dataloaders=datamodule.general_dataloader(datamodule.data,datamodule.predict_sampler_val),
                                  ckpt_path='best')
-    y_pred_test = trainer.predict(model, 
+    y_pred_test = trainer.predict(model,
                                   dataloaders=datamodule.general_dataloader(datamodule.data,datamodule.predict_sampler_test),
                                   ckpt_path='best')
     val_ids_list, y_pred_val_list = utils.collect_predictions(y_pred_val)
@@ -220,11 +220,11 @@ def wandb_train(config, name=None, tags=None, use_gpu=False, devices=None, dev=T
 
     wandb.summary['val_r2'] = r2_score(utils.get_true_ys(datamodule.data.labels,val_ids_list), y_pred_val_list)
     wandb.summary['test_r2'] = r2_score(utils.get_true_ys(datamodule.data.labels,test_ids_list), y_pred_test_list)
-    
+
     if not finish:
         # return trainer instance + datamodule
         return trainer, datamodule
-    
+
     if finish:
         # finish run
         wandb.finish()
@@ -239,7 +239,7 @@ def wandb_test(trainer, datamodule, finish=True):
         finish: boolean flag whether to finish a wandb run. Default: True.
     """
     trainer.test(ckpt_path='best', datamodule=datamodule)
-    
+
     if finish:
         # finish run
         wandb.finish()
