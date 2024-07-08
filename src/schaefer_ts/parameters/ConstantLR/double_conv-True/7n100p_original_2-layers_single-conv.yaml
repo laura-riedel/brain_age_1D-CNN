@@ -1,7 +1,7 @@
 project: 'lightweight-brain-age-prediction'
 group: 'schaefer_ts'
-name: '7n100p_3-layers_out-32_no-scaling'
-tags: ['7n','100p','3 layers', 'no scaling', 'kernel=3']
+name: '7n100p_original_2-layers_single-conv'
+tags: ['7n','100p', '2 layers', 'global pool', 'scale_after_conv=False']
 parameters:
     # dataset set-up
     schaefer_variant: '7n100p'
@@ -15,11 +15,12 @@ parameters:
     patience: 15
     # model parameters
     in_channels: 100
-    kernel_size: 3
+    kernel_size: 9
     lr: 0.00020177405202416644
-    depth: 3
-    start_out: 32
-    scale_dim: False
+    depth: 2
+    start_out: 128
+    scale_dim: True
+    scale_after_conv: False
     stride: 5
     weight_decay: 0.1
     dilation: 1

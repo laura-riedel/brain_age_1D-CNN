@@ -1,10 +1,10 @@
 project: 'lightweight-brain-age-prediction'
 group: 'schaefer_ts'
-name: '7n500p_original'
-tags: ['7n','500p']
+name: '7n100p_4-layers_out-32_double-conv'
+tags: ['7n','100p','4 layers', 'kernel=3', 'double conv', 'global pool', 'scale_after_conv=False']
 parameters:
     # dataset set-up
-    schaefer_variant: '7n500p'
+    schaefer_variant: '7n100p'
     corr_matrix: False
     shared_variants: ['7n100p','7n200p','7n500p','17n100p','17n200p','17n500p']
     additional_data_path: '../../data/schaefer/'
@@ -14,13 +14,14 @@ parameters:
     log_steps: 50
     patience: 15
     # model parameters
-    in_channels: 500
-    kernel_size: 9
+    in_channels: 100
+    kernel_size: 3
     lr: 0.00020177405202416644
-    depth: 1
-    start_out: 128
+    depth: 4
+    start_out: 32
     scale_dim: True
-    stride: 5
+    scale_after_conv: False
+    stride: 2
     weight_decay: 0.1
     dilation: 1
     conv_dropout: 0
