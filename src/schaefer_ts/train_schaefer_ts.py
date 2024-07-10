@@ -39,9 +39,9 @@ parser.add_argument('-lr_config_path','--lr_scheduler_config_path', default=None
                     help='Enter the path to the learning rate scheduler config, if applicable. Default: None.')
 parser.add_argument('--train_ratio', type=float, default=0.88,
                     help='Enter first parameter for train/val/test split regulation. On a scale from 0 to 1, which proportion of data is to be used for training? Default: 0.88.')
-parser.add_argument('--val_test_ratio', type=bool, default=0.5,
+parser.add_argument('--val_test_ratio', type=float, default=0.5,
                     help='Enter second parameter for train/val/test split regulation. On a sclae form 0 to 1, which proportion of the split not used for training is to be used for validating/testing? >0.5: more data for validation; <0.5: more data for testing. Default: 0.5.')
-parser.add_argument('--save_datasplit', type=float, default=True,
+parser.add_argument('--save_datasplit', type=bool, default=True,
                     help='Enter boolean flag whether to save the applied data split as W&B artifact. Default: True.')
 parser.add_argument('--save_overview', type=bool, default=False,
                     help='Enter boolean flag whether to save the idx/age overview as W&B artifact. Only effective with save_datasplit=True. Default: False.')
