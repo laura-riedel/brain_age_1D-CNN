@@ -12,7 +12,7 @@ parameters:
     # training set-up
     max_epochs: 175
     log_steps: 50
-    patience: 15
+    patience: 30
     # model parameters
     in_channels: 100
     kernel_size: 3
