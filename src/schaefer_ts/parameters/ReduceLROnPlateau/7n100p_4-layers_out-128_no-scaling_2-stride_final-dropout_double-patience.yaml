@@ -16,7 +16,7 @@ parameters:
     # model parameters
     in_channels: 100
     kernel_size: 3
-    lr: 0.00020177405202416644
+    lr: 0.01
     depth: 4
     start_out: 128
     scale_dim: False
