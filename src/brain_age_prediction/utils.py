@@ -477,54 +477,52 @@ def get_heldout_schaefer_overview(ukbb_path='/ritter/share/data/UKBB/ukb_data/',
     return meta_df
 
 #### OTHER HELPER FUNCTIONS
-def calculate_bag(df, single=False):
+def calculate_bag(df, models=None):
     """
     Calculate the brain age gap (BAG) for each participant in the dataframe.
     Input:
         df: dataframe including true and predicted ages
-        single: Boolean indicating whether BAGs should be calculated for
-                a single (=TRUE) ICA modality or both (=FALSE).
+        models: list of model names for which predicted ages exist as
+                "predicted_age_modelname" column. BAGs will be calculated for
+                each model's predictions. If None, a single "predicted_age"
+                column is expected for which to calculate BAGs.
     Output:
         df: dataframe with additional BAG column(s)
     """
-    if single:
+    if not models:
         df['bag'] = df['predicted_age'] - df['age']
     else:
-        df['bag_ICA25'] = df['predicted_age_ICA25'] - df['age']
-        df['bag_ICA100'] = df['predicted_age_ICA100'] - df['age']
+        for model in models:
+            df['bag_'+model] = df['predicted_age_'+model] - df['age']
     return df
 
-def detrend_bag(df, single=False):
+def detrend_bag(df, models=None):
     """
     Remove the linear effect in the brain age gap (BAG) for each participant in the dataframe.
     Input:
         df: dataframe including true and predicted ages & calculated BAGs
-        single: Boolean indicating whether linear effect should be removed for
-                a single (=TRUE) ICA modality or both (=FALSE).
+        models: list of model names for which calculated BAGs exist as
+                "bag_modelname" column. Linear effects will be removed for
+                each model's BAGs. If None, a single "bag"
+                column is expected for which to detrend BAGs.
     Output:
         df: dataframe with additional detrended BAG column(s)
     """
     X = np.array(df.loc[:,'age'], ndmin=2)
     X = np.reshape(X, (-1,1))
-    if single:
+    if not models:
         y = df.loc[:,'bag']
         model = LinearRegression()
         model.fit(X, y)
         trend = model.predict(X)
         df.loc[:,'bag_detrended'] = y-trend
     else: 
-        # ICA25
-        y_25 = df.loc[:,'bag_ICA25']
-        model_25 = LinearRegression()
-        model_25.fit(X, y_25)
-        trend_25 = model_25.predict(X)
-        df.loc[:,'bag_ICA25_detrended'] = y_25-trend_25
-        # ICA100
-        y_100 = df.loc[:,'bag_ICA100']
-        model_100 = LinearRegression()
-        model_100.fit(X, y_100)
-        trend_100 = model_100.predict(X)
-        df.loc[:,'bag_ICA100_detrended'] = y_100-trend_100
+        for model in models:
+            y = df.loc[:,'bag_'+model]
+            model = LinearRegression()
+            model.fit(X, y)
+            trend = model.predict(X)
+            df.loc[:,'bag_'+model+'_detrended'] = y-trend
     return df
     
 def strip_network_names(name, remove_hemisphere=False):
