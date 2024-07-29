@@ -141,8 +141,8 @@ class variable1DCNN(pl.LightningModule):
         self.scale_dim = scale_dim
         self.scale_after_conv = scale_after_conv
         self.stride = stride
-        self.conv_dropout = conv_dropout
-        self.final_dropout = final_dropout
+        self.conv_dropout_p = conv_dropout
+        self.final_dropout_p = final_dropout
         self.weight_decay = weight_decay
         self.dilation = dilation
         self.double_conv = double_conv
@@ -162,6 +162,9 @@ class variable1DCNN(pl.LightningModule):
         
         # define maxpool layer
         self.maxpool = nn.MaxPool1d(kernel_size=self.kernel_size, stride=self.stride)
+        # define dropout
+        self.final_dropout = nn.Dropout1d(p=self.final_dropout_p)
+        self.conv_dropout = nn.Dropout1d(p=self.conv_dropout_p)
                 
         # define model architecture
         # encoder
@@ -211,8 +214,8 @@ class variable1DCNN(pl.LightningModule):
         flattened_dimension = self.get_flattened_dimension(self.encoder)
         self.decoder = nn.Sequential()
         # add dropout if wanted
-        if self.final_dropout:
-            self.decoder.append(nn.Dropout1d(p=self.final_dropout))
+        if self.final_dropout_p:
+            self.decoder.append(self.final_dropout)
         self.decoder.append(nn.Linear(flattened_dimension, 1))
         
     def add_conv_layer(self, in_channel, out_channel):
@@ -239,8 +242,8 @@ class variable1DCNN(pl.LightningModule):
         self.encoder.append(self.act)
         
         # add dropout if wanted
-        if self.conv_dropout:
-            self.encoder.append(nn.Dropout1d(p=self.conv_dropout))
+        if self.conv_dropout_p:
+            self.encoder.append(self.conv_dropout)
 
     def get_flattened_dimension(self, model):
         """Function to figure out the dimension after nn.Flatten()
@@ -355,8 +358,8 @@ class debuggingCNN(pl.LightningModule):
         self.start_out = start_out
         self.scale_dim = scale_dim
         self.stride = stride
-        self.conv_dropout = conv_dropout
-        self.final_dropout = final_dropout
+        self.conv_dropout_p = conv_dropout
+        self.final_dropout_p = final_dropout
         self.weight_decay = weight_decay
         self.dilation = dilation
         self.double_conv = double_conv
@@ -431,8 +434,8 @@ class debuggingCNN(pl.LightningModule):
         flattened_dimension = self.get_flattened_dimension(self.encoder)
         self.decoder = nn.Sequential()
         # add dropout if wanted
-        if self.final_dropout:
-            self.decoder.append(nn.Dropout1d(p=self.final_dropout))
+        if self.final_dropout_p:
+            self.decoder.append(nn.Dropout1d(p=self.final_dropout_p))
         self.decoder.append(nn.Linear(flattened_dimension, 1))
         
     def add_conv_layer(self, in_channel, out_channel):
@@ -459,8 +462,8 @@ class debuggingCNN(pl.LightningModule):
         self.encoder.append(self.act)
         
         # add dropout if wanted
-        if self.conv_dropout:
-            self.encoder.append(nn.Dropout1d(p=self.conv_dropout))
+        if self.conv_dropout_p:
+            self.encoder.append(nn.Dropout1d(p=self.conv_dropout_p))
 
     def get_flattened_dimension(self, model):
         """Function to figure out the dimension after nn.Flatten()
