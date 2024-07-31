@@ -42,6 +42,12 @@ def save_data_info(path, datamodule, only_indices=False):
     np.savetxt(path+'data_info/val_idx.csv', datamodule.val_idx, fmt='%i')
     np.savetxt(path+'data_info/test_idx.csv', datamodule.test_idx, fmt='%i')
 
+def save_heldout_data_info(path_filename, datamodule):
+    """
+    Saves overview of datapoints (participant ID, age) to specified save path.
+    """
+    datamodule.data.labels.to_csv(path_filename, index=False)
+
 ### REPRODUCIBILITY
 # increase reproducitility by defining a seed worker
 # instructions from https://pytorch.org/docs/stable/notes/randomness.html#reproducibility
@@ -220,7 +226,7 @@ def train_model(log_path, data_path, config, device, execution='nb'):
     
     return trainer, variable_CNN, datamodule
 
-def predict_w_model(trainer, model, datamodule, log_path):
+def predict_w_model(trainer, model, datamodule, log_path, output=True):
     """
     Function for predicting the brain age of subjects in the validation + test set
     using a previously trained model. Automatically saves predictions in data_info.
@@ -228,11 +234,12 @@ def predict_w_model(trainer, model, datamodule, log_path):
         trainer: the trainer instance of the model model
         model: the trained model
         datamodule: PyTorch Lightning UKBB DataModule instance
-        log_path: path to where logs, checkpoints and data info are saved
+        log_path: path where to save the predictions
+        output: Boolean flag whether to return the predictions dataframe
     Output:
         preds_df: dataframe with predicted ages
     """
-    model.eval()
+    # model.eval()
     predictions = trainer.predict(model, datamodule)
     preds_df = pd.DataFrame(columns=['eid','batch_nb','predicted_age'])
     count = 0
@@ -243,8 +250,9 @@ def predict_w_model(trainer, model, datamodule, log_path):
             preds_df.loc[count,'predicted_age'] = float(batch[1][i])       
             count += 1
     
-    preds_df.to_csv(log_path+'data_info/predictions.csv', index=False)
-    return preds_df
+    preds_df.to_csv(log_path, index=False)
+    if output:
+        return preds_df
     
 
 def test_model(trainer, datamodule, config):
@@ -326,13 +334,13 @@ def load_datainfo(path_to_data_info, info_type):
         info = pd.read_csv(path_to_data_info+'data_info/overview.csv')
     return info
 
-def get_data_overview_with_splitinfo(path_to_data_info, index=False):
+def get_data_overview_with_splitinfo(path_to_data_info, heldout_path=None):
     """
     Loads information from the data_info directory about participants' ages 
     and in which split participants were present during model training/testing.
     Input:
-        path_to_data_info: path to where data_info is saved (without data_info itself in path)
-        index: whether an item is retrieved based on index (=True) or based on subject id (=False). Default: False.
+        path_to_data_info: path to where data_info is saved (without data_info itself in path).
+        heldout_path: if applicable, path to heldout test set overview (including file name).
     Output:
         data_overview: participant/age/split overview as dataframe  
     """
@@ -341,40 +349,29 @@ def get_data_overview_with_splitinfo(path_to_data_info, index=False):
     val_idx = load_datainfo(path_to_data_info, 'val_idx')
     test_idx = load_datainfo(path_to_data_info, 'test_idx')
     
-    # add split information to items in data_overview
-    if index:
-        # based on index
-        for idx in train_idx:
-            data_overview.loc[idx, 'split'] = 'train'
-        for idx in val_idx:
-            data_overview.loc[idx, 'split'] = 'val'
-        for idx in test_idx:
-            data_overview.loc[idx, 'split'] = 'test'
-    else:
-        # based on sub ID
-        for idx in train_idx:
-            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'train'
-        for idx in val_idx:
-            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'val'
-        for idx in test_idx:
-            data_overview.loc[data_overview['eid'] == idx, 'split'] = 'test'
+    # add split information to items in data_overview based on sub ID
+    for idx in train_idx:
+        data_overview.loc[data_overview['eid'] == idx, 'split'] = 'train'
+    for idx in val_idx:
+        data_overview.loc[data_overview['eid'] == idx, 'split'] = 'val'
+    for idx in test_idx:
+        data_overview.loc[data_overview['eid'] == idx, 'split'] = 'test'
+    if heldout_path:
+        heldout_overview = pd.read_csv(heldout_path)
+        heldout_overview['split'] = 'heldout_test'
+        data_overview = pd.concat([data_overview, heldout_overview], ignore_index=True)
             
     return data_overview
 
-def get_metadata(path_to_data_info, ukbb_data_path, index=True):
+def get_metadata(ukbb_data_path):
     """
     Get additional information about participants used in model training/testing; 
     also add in which split a participant was present.
     Input:
-        path_to_data_info: path to where data_info is saved (without data_info itself in path)
         ukbb_data_path: path to ukb_data directory (ukb_data included). E.g. 'ritter/share/data/UKBB/ukb_data'.
-        index: whether an item is retrieved based on index (=True) or based on subject id (=False). Default: True.
     Output:
-        meta_df: overview dataframe containing the IDs of included participants
-                with additional information regarding which split they were in + additional metadata
-    """
-    data_overview = get_data_overview_with_splitinfo(path_to_data_info, index)
-    
+        meta_df: overview dataframe containing the IDs of included participants + additional metadata.
+    """    
     # META INFORMATION
     # match additional info with subject IDs
     # get subject IDs, rename column for later merge
@@ -408,6 +405,23 @@ def get_metadata(path_to_data_info, ukbb_data_path, index=True):
     # important to combine BEFORE merging with data_overview in order to keep the correct ID mapping
     variables = [ids_df, bmi_df, digit_df, education_df, fluid_int_df, grip_df, depressive_ep_df, depression_all_df, depressive_rec_df, ms_df, sex_df, weekly_beer_df, ethnicity_df]
     meta_df = pd.concat(variables, axis=1)
+    return meta_df
+
+def merge_metadata_with_splitinfos(ukbb_data_path, path_to_data_info, heldout_path=None):
+    """
+    Generate big overview, retrieving + merging info of participant ID's, their ages, which split they
+    occurred in, and health-related meta data.
+    Input:
+        ukbb_data_path: path to ukb_data directory (ukb_data included). E.g. 'ritter/share/data/UKBB/ukb_data'.
+        path_to_data_info: path to where data_info is saved (without data_info itself in path).
+        heldout_path: if applicable, path to heldout test set indices (including file name).
+    Output:
+        meta_df: overview dataframe containing the IDs of included participants + which split they occured in
+            + additional metadata.
+
+    """
+    meta_df = get_metadata(ukbb_data_path)
+    data_overview = get_data_overview_with_splitinfo(path_to_data_info, heldout_path)
     # merge with data_overview
     meta_df = data_overview.merge(meta_df, on='eid', how='left')
     return meta_df
