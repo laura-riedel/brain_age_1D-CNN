@@ -531,12 +531,12 @@ def detrend_bag(df, models=None):
         trend = model.predict(X)
         df.loc[:,'bag_detrended'] = y-trend
     else: 
-        for model in models:
-            y = df.loc[:,'bag_'+model]
+        for model_name in models:
+            y = df.loc[:,'bag_'+model_name]
             model = LinearRegression()
             model.fit(X, y)
             trend = model.predict(X)
-            df.loc[:,'bag_'+model+'_detrended'] = y-trend
+            df.loc[:,'bag_'+model_name+'_detrended'] = y-trend
     return df
     
 def strip_network_names(name, remove_hemisphere=False):
