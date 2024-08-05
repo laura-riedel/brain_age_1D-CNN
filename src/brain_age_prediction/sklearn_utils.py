@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import wandb
 import h5py
 from scipy.stats import zscore
@@ -35,7 +36,7 @@ def load_datasplit(split, schaefer_variant, remove_0=False, flatten=False, norma
     Loads specified data split of specified Schaefer variant from HDF5 file and 
     outputs a 3D matrix of the data (X) and the subjects' ages (y).
     Input:
-        split: data split as string. Either 'train','val' or 'test'.
+        split: data split as string. Either 'train','val','test' or 'heldout_test'.
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. 
@@ -50,8 +51,11 @@ def load_datasplit(split, schaefer_variant, remove_0=False, flatten=False, norma
         y: labels aka ages of subjects as 1D array
     """
     # get overview
-    data_df = utils.get_data_overview_with_splitinfo(datasplit_dir)
-    split_df = data_df.loc[data_df['split']==split]
+    if split in ['train','val','test']:
+        data_df = utils.get_data_overview_with_splitinfo(datasplit_dir)
+        split_df = data_df.loc[data_df['split']==split]
+    elif split == 'heldout_test':
+        split_df = pd.read_csv(datasplit_dir)
     # derive information
     y = split_df['age'].to_numpy()
     sub_ids = split_df['eid'].to_numpy()
@@ -95,7 +99,7 @@ def access_datasplit(split, schaefer_variant, no_0=False, normalise=False, short
     Loads specified data split of specified Schaefer variant from the dataset shortcut
     in the HDF5 file and outputs a 3D or 2D matrix of the data (X) and the subjects' ages (y).
     Input:
-        split: data split as string. Either 'train','val' or 'test'.
+        split: data split as string. Either 'train','val','test' or 'heldout_test'.
         schaefer_variant: which variant to load. Expects string of the form 'XnYp' where X is the number of
             networks and p is the number of parcellations. Possible values: '7n100p','7n200p','7n500p',
             '7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p'. 
