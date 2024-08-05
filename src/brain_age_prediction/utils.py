@@ -22,7 +22,7 @@ import seaborn as sns
 from IPython.display import display
 
 # import data + model modules
-from brain_age_prediction import data, models, plotting
+from brain_age_prediction import data, models, viz
 
 ##################################################################################
 ### SAVING THINGS
@@ -283,7 +283,7 @@ def test_model(trainer, datamodule, config):
     # visualise training
     print(f'\nVisualise training of model "{model_info}" {data_info}...')
     metrics = get_current_metrics(trainer, show=True)
-    plotting.plot_training(data=metrics, title=f'Training visualisation of the ICA{ica_info} 1D-CNN with {gc} {data_info}.')
+    viz.plot_training(data=metrics, title=f'Training visualisation of the ICA{ica_info} 1D-CNN with {gc} {data_info}.')
 
 #### LOADING DATA
 def get_current_metrics(trainer, show=False):
