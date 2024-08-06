@@ -32,7 +32,7 @@ def get_plot_values(df):
     return xmin, xmax, xstep, xrange
 
 # BAGs
-def preds_corr_overview(df, variables=True):
+def preds_corr_overview(df, variables=True, models=None):
     """
     Calculate correlations between all aspects of interest.
     Expects an overview dataframe that is limited to those IDs for which
@@ -44,27 +44,47 @@ def preds_corr_overview(df, variables=True):
             variables of interest. If variables=False, calculate correlations
             between the true age and the models' predicted age + BAG + 
             detrended BAG.
+        models: list of model names for which BAGs exist as "bag_modelname"
+                and "bag_modelname_detrended" columns. If None, single 
+                "bag"/"bag_detrended" columns are expected for which to 
+                calculate correlations.
     Output:
         correlations_df: correlation overview dataframe.
     """
+    bag = 'bag_'
+    connector = '_'
+    if not models:
+        models = ['']
+        bag = 'bag'
+        connector = ''
     if variables:
         correlations_df = pd.DataFrame(columns=['Variable'])
         idx = 0
         for column in df.columns[3:17]:
-            correlations_df.loc[idx,'Variable'] = column
-            correlations_df.loc[idx,'Corr BAG original model'] = df['bag_orig'].corr(df[column], method='spearman')
-            correlations_df.loc[idx,'Corr BAG new model'] = df['bag_new'].corr(df[column], method='spearman')
-            correlations_df.loc[idx,'Corr detrended BAG original model'] = df['bag_orig_detrended'].corr(df[column], method='spearman')
-            correlations_df.loc[idx,'Corr detrended BAG new model'] = df['bag_new_detrended'].corr(df[column], method='spearman')
+            for model in models:
+                correlations_df.loc[idx,'Variable'] = column
+                correlations_df.loc[idx,'Corr BAG '+model+' model'] = df[bag+model].corr(df[column], method='spearman')
+                #correlations_df.loc[idx,'Corr BAG new model'] = df['bag_new'].corr(df[column], method='spearman')
+                correlations_df.loc[idx,'Corr detrended BAG '+model+' model'] = df[bag+model+'_detrended'].corr(df[column], method='spearman')
+                #correlations_df.loc[idx,'Corr detrended BAG new model'] = df['bag_new_detrended'].corr(df[column], method='spearman')
             idx += 1
     else:
-        rows = ['Predicted age original model','Predicted age new model',
-                'BAG original model','BAG new model',
-                'Detrended BAG original model','Detrended BAG new model']
-        corr_cols = ['predicted_age_orig','predicted_age_new','bag_orig',
-                     'bag_new','bag_orig_detrended','bag_new_detrended']
+        # rows = ['Predicted age original model','Predicted age new model',
+        #         'BAG original model','BAG new model',
+        #         'Detrended BAG original model','Detrended BAG new model']
+        # corr_cols = ['predicted_age_orig','predicted_age_new','bag_orig',
+        #              'bag_new','bag_orig_detrended','bag_new_detrended']
+        rows = []
+        corr_cols = []
+        for model in models:
+            rows.append(f'Predicted age {model} model')
+            rows.append(f'BAG {model} model')
+            rows.append(f'Detrended BAG {model} model')
+            corr_cols.append(f'predicted_age{connector}{model}')
+            corr_cols.append(f'bag{connector}{model}')
+            corr_cols.append(f'bag{connector}{model}_detrended')
         correlations_df = pd.DataFrame(columns=['True age vs.','Corr'])
-        for idx in range(0,6):
+        for idx in range(len(rows)):
             correlations_df.loc[idx,'True age vs.'] = rows[idx]
             correlations_df.loc[idx,'Corr'] = df['age'].corr(df[corr_cols[idx]], method='spearman')
     return correlations_df
