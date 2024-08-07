@@ -40,7 +40,7 @@ def preds_corr_overview(df, variables=True, models=None):
     Input:
         df: (heldout) overview pandas dataframe.
         variables: Boolean flag. If variables=True, calculate correlations 
-            between the two models' BAG + degrended BAG and all health 
+            between the models' BAG + degrended BAG and all health 
             variables of interest. If variables=False, calculate correlations
             between the true age and the models' predicted age + BAG + 
             detrended BAG.
@@ -64,16 +64,9 @@ def preds_corr_overview(df, variables=True, models=None):
             for model in models:
                 correlations_df.loc[idx,'Variable'] = column
                 correlations_df.loc[idx,'Corr BAG '+model+' model'] = df[bag+model].corr(df[column], method='spearman')
-                #correlations_df.loc[idx,'Corr BAG new model'] = df['bag_new'].corr(df[column], method='spearman')
                 correlations_df.loc[idx,'Corr detrended BAG '+model+' model'] = df[bag+model+'_detrended'].corr(df[column], method='spearman')
-                #correlations_df.loc[idx,'Corr detrended BAG new model'] = df['bag_new_detrended'].corr(df[column], method='spearman')
             idx += 1
     else:
-        # rows = ['Predicted age original model','Predicted age new model',
-        #         'BAG original model','BAG new model',
-        #         'Detrended BAG original model','Detrended BAG new model']
-        # corr_cols = ['predicted_age_orig','predicted_age_new','bag_orig',
-        #              'bag_new','bag_orig_detrended','bag_new_detrended']
         rows = []
         corr_cols = []
         for model in models:
