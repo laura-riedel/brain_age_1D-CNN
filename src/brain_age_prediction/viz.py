@@ -51,6 +51,10 @@ def preds_corr_overview(df, variables=True, models=None):
     Output:
         correlations_df: correlation overview dataframe.
     """
+    var_columns = ['bmi', 'digit substitution', 'education', 'fluid intelligence',
+                   'grip', 'depressive episode', 'all depression',
+                   'recurrent depressive disorder', 'multiple sclerosis', 'sex',
+                   'weekly beer', 'genetic pc 1', 'genetic pc 2', 'genetic pc 3']
     bag = 'bag_'
     connector = '_'
     if not models:
@@ -60,7 +64,7 @@ def preds_corr_overview(df, variables=True, models=None):
     if variables:
         correlations_df = pd.DataFrame(columns=['Variable'])
         idx = 0
-        for column in df.columns[3:17]:
+        for column in var_columns:
             for model in models:
                 correlations_df.loc[idx,'Variable'] = column
                 correlations_df.loc[idx,'Corr BAG '+model+' model'] = df[bag+model].corr(df[column], method='spearman')
@@ -80,6 +84,39 @@ def preds_corr_overview(df, variables=True, models=None):
         for idx in range(len(rows)):
             correlations_df.loc[idx,'True age vs.'] = rows[idx]
             correlations_df.loc[idx,'Corr'] = df['age'].corr(df[corr_cols[idx]], method='spearman')
+    return correlations_df
+
+def bootstrap_overview(corrs_dict, variables=True, model=None):
+    var_columns = ['bmi', 'digit substitution', 'education', 'fluid intelligence',
+                   'grip', 'depressive episode', 'all depression',
+                   'recurrent depressive disorder', 'multiple sclerosis', 'sex',
+                   'weekly beer', 'genetic pc 1', 'genetic pc 2', 'genetic pc 3']
+    connector = '_'
+    if not model:
+        model = ''
+        connector = ''
+    if variables:
+        correlations_df = pd.DataFrame(columns=['Variable'])
+        for idx in range(len(var_columns)):
+            correlations_df.loc[idx,'Variable'] = var_columns[idx]
+            correlations_df.loc[idx,'Corr BAG '+model+' model mean'] = corrs_dict['corrs variables']['mean'][idx]
+            correlations_df.loc[idx,'Corr BAG '+model+' model std'] = corrs_dict['corrs variables']['std'][idx]
+            correlations_df.loc[idx,'Corr detrended BAG '+model+' model mean'] = corrs_dict['corrs variables detrended']['mean'][idx]
+            correlations_df.loc[idx,'Corr detrended BAG '+model+' model std'] = corrs_dict['corrs variables detrended']['std'][idx]
+    else:
+        rows = []
+        corr_cols = []
+        rows.append(f'Predicted age {model} model')
+        rows.append(f'BAG {model} model')
+        rows.append(f'Detrended BAG {model} model')
+        corr_cols.append(f'predicted_age{connector}{model}')
+        corr_cols.append(f'bag{connector}{model}')
+        corr_cols.append(f'bag{connector}{model}_detrended')
+        correlations_df = pd.DataFrame(columns=['True age vs.','Corr mean','Corr std'])
+        for idx in range(len(rows)):
+            correlations_df.loc[idx,'True age vs.'] = rows[idx]
+            correlations_df.loc[idx,'Corr mean'] = corrs_dict['corrs true age']['mean'][idx]
+            correlations_df.loc[idx,'Corr std'] = corrs_dict['corrs true age']['std'][idx]
     return correlations_df
 
 def bag_viz(df, variable_name, plot_type, label_x=None, detrended=True, y_ticks=[-25,-20,-15,-10,-5,0,5,10,15,20,25], fig_path=None):
