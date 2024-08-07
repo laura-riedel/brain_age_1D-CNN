@@ -538,6 +538,47 @@ def detrend_bag(df, models=None):
             trend = model.predict(X)
             df.loc[:,'bag_'+model_name+'_detrended'] = y-trend
     return df
+
+def preds_corr(df, column=None, model_name=None, variables=True):
+    """
+    Calculate correlations between all aspects of interest.
+    Expects an overview dataframe that is limited to those IDs for which
+    predictions exist.
+    Input:
+        df: (heldout) overview pandas dataframe.
+        column: necessary if variables=True. Name for column to correlate 
+            with meta information variables, e.g. 'bag' or 'bag_detrended'.
+        model_name: necessary if variables=False. Model name for which to 
+            calculate correlations between the true age and the model's 
+            predicted age, BAG, and detrended BAG.
+        variables: Boolean flag. If variables=True, calculate correlations 
+            between the models' BAG + degrended BAG and all health 
+            variables of interest. If variables=False, calculate correlations
+            between the true age and the models' predicted age + BAG + 
+            detrended BAG.
+        models: list of model names for which BAGs exist as "bag_modelname"
+                and "bag_modelname_detrended" columns. If None, single 
+                "bag"/"bag_detrended" columns are expected for which to 
+                calculate correlations.
+    Output:
+        corrs: list of correlations.
+    """
+    corrs = []
+    if variables:
+        for var_column in df.columns[3:17]:
+            corrs.append(df[column].corr(df[var_column], method='spearman'))
+    else:
+        columns = []
+        if model_name:
+            columns.append(f'predicted_age_{model_name}')
+            columns.append(f'bag_{model_name}')
+            columns.append(f'bag_{model_name}_detrended')
+            model_name = '_'+model_name
+        else:
+            columns = ['predicted_age', 'bag', 'bag_detrended']
+        for var_column in columns:
+            corrs.append(df['age'].corr(df[var_column], method='spearman'))
+    return corrs
     
 def strip_network_names(name, remove_hemisphere=False):
     """
