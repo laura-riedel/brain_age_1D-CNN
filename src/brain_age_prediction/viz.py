@@ -100,9 +100,9 @@ def bootstrap_overview(corrs_dict, variables=True, model=None):
         for idx in range(len(var_columns)):
             correlations_df.loc[idx,'Variable'] = var_columns[idx]
             correlations_df.loc[idx,'Corr BAG '+model+' model mean'] = corrs_dict['corrs variables']['mean'][idx]
-            correlations_df.loc[idx,'Corr BAG '+model+' model std'] = corrs_dict['corrs variables']['std'][idx]
+            correlations_df.loc[idx,'Corr BAG '+model+' model sem'] = corrs_dict['corrs variables']['std'][idx]
             correlations_df.loc[idx,'Corr detrended BAG '+model+' model mean'] = corrs_dict['corrs variables detrended']['mean'][idx]
-            correlations_df.loc[idx,'Corr detrended BAG '+model+' model std'] = corrs_dict['corrs variables detrended']['std'][idx]
+            correlations_df.loc[idx,'Corr detrended BAG '+model+' model sem'] = corrs_dict['corrs variables detrended']['std'][idx]
     else:
         rows = []
         corr_cols = []
@@ -112,11 +112,11 @@ def bootstrap_overview(corrs_dict, variables=True, model=None):
         corr_cols.append(f'predicted_age{connector}{model}')
         corr_cols.append(f'bag{connector}{model}')
         corr_cols.append(f'bag{connector}{model}_detrended')
-        correlations_df = pd.DataFrame(columns=['True age vs.','Corr mean','Corr std'])
+        correlations_df = pd.DataFrame(columns=['True age vs.','Corr mean','Corr sem'])
         for idx in range(len(rows)):
             correlations_df.loc[idx,'True age vs.'] = rows[idx]
             correlations_df.loc[idx,'Corr mean'] = corrs_dict['corrs true age']['mean'][idx]
-            correlations_df.loc[idx,'Corr std'] = corrs_dict['corrs true age']['std'][idx]
+            correlations_df.loc[idx,'Corr sem'] = corrs_dict['corrs true age']['std'][idx]
     return correlations_df
 
 def bag_viz(df, variable_name, plot_type, label_x=None, detrended=True, y_ticks=[-25,-20,-15,-10,-5,0,5,10,15,20,25], fig_path=None):
