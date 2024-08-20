@@ -625,19 +625,50 @@ def bootstrap_pipeline(df, models=None, n_iterations=10):
     """
     if not models:
         models = ['']
-    corrs_dict = bootstrap_corrs(df=df, model_name=models[0], n_iterations=n_iterations)
-    corrs_true_age_df = viz.bootstrap_overview(corrs_dict, variables=False, model=models[0])
-    corrs_vars_df = viz.bootstrap_overview(corrs_dict, variables=True, model=models[0])
+    
+    # get overviews for first model
+    corrs_true_age_df, corrs_vars_df = get_model_bootstrap_overview(df=df,
+                                                                    model_name=models[0],
+                                                                    n_iterations=n_iterations)
+    # optional further models
     if len(models) > 1:
         for model_idx in range(1, len(models)):
-            new_corrs_dict = bootstrap_corrs(df=df, model_name=models[model_idx], n_iterations=n_iterations)
-            new_corrs_true_age_df = viz.bootstrap_overview(new_corrs_dict, variables=False, model=models[model_idx])
-            new_corrs_vars_df = viz.bootstrap_overview(new_corrs_dict, variables=True, model=models[model_idx])
+            new_corrs_true_age_df, new_corrs_vars_df = get_model_bootstrap_overview(df=df,
+                                                                                    model_name=models[model_idx],
+                                                                                    n_iterations=n_iterations)
+            # merge with previous overview
             corrs_true_age_df = pd.concat([corrs_true_age_df,new_corrs_true_age_df], ignore_index=True)
             corrs_vars_df = corrs_vars_df.merge(new_corrs_vars_df, on='Variable')
     return corrs_true_age_df, corrs_vars_df
     
-    
+def get_model_bootstrap_overview(df, model_name, n_iterations):
+    """
+    Create overviews over true age + variable correlations for one model,
+    displaying the data's 'raw' correlations as well as 
+    the bootstrap mean + SEM, and the zscore.
+    """
+    # heldout corrs
+    corrs_true_age_df = viz.preds_corr_overview(df, variables=False, models=[model_name])
+    corrs_vars_df = viz.preds_corr_overview(df, variables=True, models=[model_name])
+    # bootstrapped corrs
+    corrs_bs_dict = bootstrap_corrs(df=df, model_name=model_name, n_iterations=n_iterations)
+    corrs_true_age_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=False, model=model_name)
+    corrs_vars_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=True, model=model_name)
+    # merge
+    corrs_true_age_df = corrs_true_age_df.merge(corrs_true_age_bs_df, on='True age vs.')
+    corrs_vars_df = corrs_vars_df.merge(corrs_vars_bs_df, on='Variable')
+    # calculate zscore
+    corrs_true_age_df['Corr z'] = (corrs_true_age_df['Corr'] - corrs_true_age_df['Corr mean']) / corrs_true_age_df['Corr sem']
+    corrs_vars_df['Corr BAG '+model_name+' z'] = (corrs_vars_df['Corr BAG '+model_name+' model'] - corrs_vars_df['Corr BAG '+model_name+' model mean']) / corrs_vars_df['Corr BAG '+model_name+' model sem']
+    corrs_vars_df['Corr detrended BAG '+model_name+' z'] = (corrs_vars_df['Corr detrended BAG '+model_name+' model'] - corrs_vars_df['Corr detrended BAG '+model_name+' model mean']) / corrs_vars_df['Corr detrended BAG '+model_name+' model sem']
+    # reorder colums
+    cols = ['Variable','Corr BAG '+model_name+' model', 'Corr BAG '+model_name+' model mean',
+            'Corr BAG '+model_name+' model sem', 'Corr BAG '+model_name+' z',
+            'Corr detrended BAG '+model_name+' model', 'Corr detrended BAG '+model_name+' model mean', 
+            'Corr detrended BAG '+model_name+' model sem', 'Corr detrended BAG '+model_name+' z']
+    corrs_vars_df = corrs_vars_df.reindex(columns=cols)
+    return corrs_true_age_df, corrs_vars_df
+
 def strip_network_names(name, remove_hemisphere=False):
     """
     Strips long Schaefer parcellation network names to contain only the pure network names.
