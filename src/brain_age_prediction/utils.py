@@ -491,6 +491,37 @@ def get_heldout_schaefer_overview(ukbb_path='/ritter/share/data/UKBB/ukb_data/',
     meta_df.reset_index(drop=True, inplace=True)
     return meta_df
 
+def load_test_batches(train_ratio=0.88, batch_size_dev=2000, batch_size_eval=5000):
+    """
+    Loads + returns a batch each of the development and heldout test sets.
+    Loads entire test sets with default batch sizes.
+    For more info see load_test_batch.
+    """
+    dev_batch = load_test_batch(dev=True, train_ratio=train_ratio, batch_size=batch_size_dev)
+    eval_batch = load_test_batch(dev=False, batch_size=batch_size_eval)
+    return dev_batch, eval_batch
+
+def load_test_batch(dev=True, train_ratio=0.88, batch_size=2000):
+    """
+    Loads + returns a batch of a test set.
+    Input:
+        dev: Boolean flag whether to use development or heldout set.
+            If True, dev test set is loaded; if False, heldout test
+            set is loaded. Default: True.
+        train_ratio: parameter for train/val/test split regulation. 
+            On a scale from 0 to 1, which proportion of data is to 
+            be used for training? Default: 0.88.
+        batch_size: how many subs of test set to load.
+            With 2000, dev set is loaded entirely; with 5000, heldout
+            set is loaded entirely. Smaller batch sizes load a subset.
+            Default: 2000.
+    Output:
+        batch: [[subjects' timeseries], [subjects' ages], [subjects' ID's]]
+    """
+    datamodule = data.UKBBDataModule(dev=dev, train_ratio=train_ratio, batch_size=batch_size)
+    datamodule.setup()
+    return next(iter(datamodule.test_dataloader()))
+
 #### OTHER HELPER FUNCTIONS
 def calculate_bag(df, models=None):
     """
@@ -669,7 +700,7 @@ def get_model_bootstrap_overview(df, model_name, n_iterations):
     corrs_vars_df = corrs_vars_df.reindex(columns=cols)
     return corrs_true_age_df, corrs_vars_df
 
-def strip_network_names(name, remove_hemisphere=False):
+def strip_network_names(name, remove_nr=True, remove_hemisphere=False):
     """
     Strips long Schaefer parcellation network names to contain only the pure network names.
     Input:
@@ -679,12 +710,13 @@ def strip_network_names(name, remove_hemisphere=False):
         name: stripped network name (str), e.g. 'LH_Vis' (or 'Vis' if remove_hemisphere = True).
     """
     pattern_l = r'^\d+Networks_'
-    pattern_r = r'_\d+$'
     if remove_hemisphere:
         name = re.sub(pattern_l+'[L|R]H_','',name)
     else:
         name = re.sub(pattern_l,'',name)
-    name = re.sub(pattern_r,'',name)
+    if remove_nr:
+        pattern_r = r'_\d+$'
+        name = re.sub(pattern_r,'',name)
     return name
 
 def collect_predictions(predictions):
