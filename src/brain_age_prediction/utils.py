@@ -522,6 +522,25 @@ def load_test_batch(dev=True, train_ratio=0.88, batch_size=2000):
     datamodule.setup()
     return next(iter(datamodule.test_dataloader()))
 
+def get_network_names(network_names_path='../../data/schaefer/7n100p/label_names_7n100p.csv',
+                      remove_nr=False, remove_hemisphere=False):
+    """
+    Get list of all brain area / network names.
+    Options to remove the network number and/or the hemisphere affiliation.
+    Input:
+        network_names_path: path to relevant label_names_[VARIANT].csv.
+        remove_nr: Boolean flag. If True, strips numbering of networks (_1, _2 etc.). Default: True.
+        remove_hemisphere: Boolean flag. If True, strips LH_/RH_, too. Default: False.
+    Returns:
+        brain_areas: list of network names as strings.
+    """
+    network_names_path = network_names_path
+    network_names_df = pd.read_csv(network_names_path, names=['network_name'])
+    brain_areas = network_names_df['network_name'].values
+    brain_areas = [strip_network_names(brain_areas[i], remove_nr=remove_nr, remove_hemisphere=remove_hemisphere)
+                   for i in range(len(brain_areas))]
+    return brain_areas
+
 #### OTHER HELPER FUNCTIONS
 def calculate_bag(df, models=None):
     """
@@ -689,9 +708,9 @@ def get_model_bootstrap_overview(df, model_name, n_iterations):
     corrs_true_age_df = corrs_true_age_df.merge(corrs_true_age_bs_df, on='True age vs.')
     corrs_vars_df = corrs_vars_df.merge(corrs_vars_bs_df, on='Variable')
     # calculate zscore
-    corrs_true_age_df['Corr z'] = (corrs_true_age_df['Corr'] - corrs_true_age_df['Corr mean']) / corrs_true_age_df['Corr sem']
-    corrs_vars_df['Corr BAG '+model_name+' z'] = (corrs_vars_df['Corr BAG '+model_name+' model'] - corrs_vars_df['Corr BAG '+model_name+' model mean']) / corrs_vars_df['Corr BAG '+model_name+' model sem']
-    corrs_vars_df['Corr detrended BAG '+model_name+' z'] = (corrs_vars_df['Corr detrended BAG '+model_name+' model'] - corrs_vars_df['Corr detrended BAG '+model_name+' model mean']) / corrs_vars_df['Corr detrended BAG '+model_name+' model sem']
+    corrs_true_age_df['Corr z'] = corrs_true_age_df['Corr mean'] / corrs_true_age_df['Corr sem']
+    corrs_vars_df['Corr BAG '+model_name+' z'] = corrs_vars_df['Corr BAG '+model_name+' model mean'] / corrs_vars_df['Corr BAG '+model_name+' model sem']
+    corrs_vars_df['Corr detrended BAG '+model_name+' z'] = corrs_vars_df['Corr detrended BAG '+model_name+' model mean'] / corrs_vars_df['Corr detrended BAG '+model_name+' model sem']
     # reorder colums
     cols = ['Variable','Corr BAG '+model_name+' model', 'Corr BAG '+model_name+' model mean',
             'Corr BAG '+model_name+' model sem', 'Corr BAG '+model_name+' z',
@@ -705,6 +724,7 @@ def strip_network_names(name, remove_nr=True, remove_hemisphere=False):
     Strips long Schaefer parcellation network names to contain only the pure network names.
     Input:
         name: network name (str), e.g. '7Networks_LH_Vis_1'.
+        remove_nr: Boolean flag. If True, strips numbering of networks (_1, _2 etc.). Default: True.
         remove_hemisphere: Boolean flag. If True, strips LH_/RH_, too. Default: False.
     Output:
         name: stripped network name (str), e.g. 'LH_Vis' (or 'Vis' if remove_hemisphere = True).
