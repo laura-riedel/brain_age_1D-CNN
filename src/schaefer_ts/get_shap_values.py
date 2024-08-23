@@ -45,5 +45,5 @@ shap_values = explainer.shap_values(eval_test[0])
 # save predictions
 print('Save SHAP values...')
 with h5py.File(save_dir+'shap_values.hdf5', 'a') as hdf5:
-    grp = hdf5.create_group(args.model)
-    grp.create_dataset(args.save_name, data=shap_values, compression='gzip', compression_opts=9)
+    save_path = args.model+'/'+args.save_name
+    hdf5.create_dataset(save_path, data=shap_values, compression='gzip', compression_opts=9)
