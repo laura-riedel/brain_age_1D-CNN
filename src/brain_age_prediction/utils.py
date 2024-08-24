@@ -796,9 +796,9 @@ def add_specific_network_columns(df):
         df: long-form dataframe with at least the following columns: 
             'id', 'parcellation', 'hemisphere', 'network', 'area' (, ...)
     """
-    df.insert(2,'hemisphere',test_df.apply(lambda row: utils.extract_hemisphere(row['parcellation']), axis=1))
-    df.insert(3,'network',test_df.apply(lambda row: utils.extract_network(row['parcellation']), axis=1))
-    df.insert(4,'area',test_df.apply(lambda row: utils.extract_area(row['parcellation']), axis=1))
+    df.insert(2,'hemisphere',df.apply(lambda row: extract_hemisphere(row['parcellation']), axis=1))
+    df.insert(3,'network',df.apply(lambda row: extract_network(row['parcellation']), axis=1))
+    df.insert(4,'area',df.apply(lambda row: extract_area(row['parcellation']), axis=1))
     return df
 
 def collect_predictions(predictions):
