@@ -785,6 +785,22 @@ def extract_area(full_network_str):
         area_name = re.sub(pattern_r,'',area_name)
     return area_name
 
+def add_specific_network_columns(df):
+    """
+    Insert information columns on a parcellation's hemisphere, network and brain area
+    to an existing long-form dataframe.
+    Input:
+        df: long-form dataframe with at least the following columns: 
+            'id', 'parcellation' (, ...)
+    Output:
+        df: long-form dataframe with at least the following columns: 
+            'id', 'parcellation', 'hemisphere', 'network', 'area' (, ...)
+    """
+    df.insert(2,'hemisphere',test_df.apply(lambda row: utils.extract_hemisphere(row['parcellation']), axis=1))
+    df.insert(3,'network',test_df.apply(lambda row: utils.extract_network(row['parcellation']), axis=1))
+    df.insert(4,'area',test_df.apply(lambda row: utils.extract_area(row['parcellation']), axis=1))
+    return df
+
 def collect_predictions(predictions):
     """
     Collects all batched predictions and their corresponding sub IDs 
