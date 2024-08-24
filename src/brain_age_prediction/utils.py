@@ -721,7 +721,7 @@ def get_model_bootstrap_overview(df, model_name, n_iterations):
 
 def strip_network_names(name, remove_nr=True, remove_hemisphere=False):
     """
-    Strips long Schaefer parcellation network names to contain only the pure network names.
+    Strips long Schaefer parcellation network names to contain only the pure network + area names.
     Input:
         name: network name (str), e.g. '7Networks_LH_Vis_1'.
         remove_nr: Boolean flag. If True, strips numbering of networks (_1, _2 etc.). Default: True.
@@ -738,6 +738,52 @@ def strip_network_names(name, remove_nr=True, remove_hemisphere=False):
         pattern_r = r'_\d+$'
         name = re.sub(pattern_r,'',name)
     return name
+
+def extract_hemisphere(full_networ_str):
+    """
+    Extracts hemisphere from network name of the form 'HEMISPHERE_NETWORK_(AREA_)NR'.
+    Input:
+        full_network_str: full network name (str), e.g. 'LH_Vis_1'.
+    Output:
+        hemisphere: hemisphere info (str), e.g. 'LH'.
+    """
+    pattern_r = r'_.*'
+    hemisphere = re.sub(pattern_r,'',full_networ_str)
+    return hemisphere
+
+def extract_network(full_network_str):
+    """
+    Extracts pure network name from network name of the form 'HEMISPHERE_NETWORK_(AREA_)NR'.
+    Input:
+        full_network_str: full network name (str), e.g. 'LH_Vis_1'.
+    Output:
+        network_name: pure network name (str), e.g. 'Vis'.
+    """
+    pattern_l = r'[L|R]H_'
+    pattern_r = r'_.*\d+$'
+    network_name = re.sub(pattern_l,'',full_network_str)
+    network_name = re.sub(pattern_r,'',network_name)
+    return network_name
+
+def extract_area(full_network_str):
+    """
+    Extracts pure area name from network name of the form 'HEMISPHERE_NETWORK_(AREA_)NR'.
+    Input:
+        full_network_str: full network name (str), e.g. 'LH_DorsAttn_Post_1'.
+    Output:
+        area_name: pure area name (str), e.g. 'Post'.
+    """
+    network_name = extract_network(full_network_str)
+    if network_name == 'Vis':
+        area_name = 'fullVis'
+    elif network_name == 'SomMot':
+        area_name = 'fullSomMot'
+    else:
+        pattern_l = r'^[L|R]H_'+network_name+'_'
+        pattern_r = r'_\d+$'
+        area_name = re.sub(pattern_l,'',full_network_str)
+        area_name = re.sub(pattern_r,'',area_name)
+    return area_name
 
 def collect_predictions(predictions):
     """
