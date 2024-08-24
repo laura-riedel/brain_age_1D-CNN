@@ -1,5 +1,6 @@
 import argparse
 import h5py
+import csv
 import shap
 from brain_age_prediction import models, utils
 ##################################################################################
@@ -13,6 +14,8 @@ parser.add_argument('-batch_size_dev', type=int, default=2000,
                     help='Which size of the development test set to use. Default: 2000 (=all).')
 parser.add_argument('-batch_size_eval', type=int, default=5000,
                     help='Which size of the heldout test set to use. Default: 5000 (=all).')
+parser.add_argument('-save_sub_order_shortcut', type=bool, default=False,
+                    help='Should a shortcut be saved in which order the subjects are loaded? (Only needed one time.) Default: False.')
 
 args = parser.parse_args()
 ##################################################################################
@@ -47,3 +50,12 @@ print('Save SHAP values...')
 with h5py.File(save_dir+'shap_values.hdf5', 'a') as hdf5:
     save_path = args.model+'/'+args.save_name
     hdf5.create_dataset(save_path, data=shap_values, compression='gzip', compression_opts=9)
+
+# optional: save sub order shortcut
+if args.save_sub_order_shortcut:
+    print('Save shortcut in which order the subjects are loaded by the DataLoader...')
+    sub_ids = eval_test[2].numpy()
+    with open('../../data/schaefer/heldout_test_set_100-500p_dataloader_order_43.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        for sub in sub_ids:
+            writer.writerow([sub])
