@@ -801,6 +801,32 @@ def add_specific_network_columns(df):
     df.insert(4,'area',df.apply(lambda row: extract_area(row['parcellation']), axis=1))
     return df
 
+def create_long_df(shap_values, sub_shortcut_path='../../data/schaefer/heldout_test_set_100-500p_dataloader_order_43.csv'):
+    """
+    Create long table of mean SHAP values per parcellation for easier visualisation creation.
+    Input:
+        shap_values: array of SHAP values of shape (N_SUBS, 100, 490).
+        sub_shortcut_path: path to shortcut of subject ordering from the dataloader 
+            that was used to create the SHAP values.
+    Output:
+        shap_df: long-form table of mean SHAP values per parcellation per subject.
+    """
+    # load order of subjects
+    sub_order = np.loadtxt(sub_shortcut_path, dtype=int)
+    # get mean SHAP value per parcellation for each sub
+    mean_area = np.mean(np.abs(shap_values),axis=2)
+    # get brain area / network names
+    network_names = get_network_names()
+    # create wide df
+    shap_df = pd.DataFrame(mean_area, columns=network_names)
+    shap_df.insert(0,'id',sub_order)
+    # convert to long df
+    shap_df = shap_df.melt(id_vars=['id'], var_name='parcellation', value_name='shap')
+    # add column of absolute SHAP values
+    shap_df['|shap|'] = shap_df['shap'].abs()
+    shap_df = add_specific_network_columns(shap_df)
+    return shap_df
+
 def collect_predictions(predictions):
     """
     Collects all batched predictions and their corresponding sub IDs 
