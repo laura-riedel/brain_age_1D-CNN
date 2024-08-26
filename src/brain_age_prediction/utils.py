@@ -775,14 +775,16 @@ def extract_area(full_network_str):
     """
     network_name = extract_network(full_network_str)
     if network_name == 'Vis':
-        area_name = 'fullVis'
+        area_name = 'full Vis'
     elif network_name == 'SomMot':
-        area_name = 'fullSomMot'
+        area_name = 'full SomMot'
     else:
         pattern_l = r'^[L|R]H_'+network_name+'_'
         pattern_r = r'_\d+$'
         area_name = re.sub(pattern_l,'',full_network_str)
         area_name = re.sub(pattern_r,'',area_name)
+        if area_name in ['PFCl','Par']:
+            area_name = area_name+' '+network_name
     return area_name
 
 def add_specific_network_columns(df):
@@ -823,7 +825,6 @@ def create_long_df(shap_values, sub_shortcut_path='../../data/schaefer/heldout_t
     # convert to long df
     shap_df = shap_df.melt(id_vars=['id'], var_name='parcellation', value_name='shap')
     # add column of absolute SHAP values
-    shap_df['|shap|'] = shap_df['shap'].abs()
     shap_df = add_specific_network_columns(shap_df)
     return shap_df
 
