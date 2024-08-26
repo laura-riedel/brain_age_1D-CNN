@@ -824,9 +824,35 @@ def create_long_df(shap_values, sub_shortcut_path='../../data/schaefer/heldout_t
     shap_df.insert(0,'id',sub_order)
     # convert to long df
     shap_df = shap_df.melt(id_vars=['id'], var_name='parcellation', value_name='shap')
-    # add column of absolute SHAP values
+    # add hemisphere + network + area columns
     shap_df = add_specific_network_columns(shap_df)
+    # add area mean + area weight column
+    weights_df = pd.DataFrame(columns=['area','area weight'])
+    for network in shap_df['network'].unique():
+        weight = shap_df[shap_df['network'] == network]['area'].value_counts() / len(shap_df[shap_df['network'] == network])
+        df_dict = {
+            'area': weight.index, 
+            'area weight': weight.values
+        }
+        weights_df = pd.concat([weights_df, pd.DataFrame(df_dict)], ignore_index=True)
+    area_mean = shap_df.groupby('area')['shap'].mean()
+    area_mean_df = pd.DataFrame({'area': area_mean.index, 'mean area shap': area_mean.values})
+    area_mean_df = area_mean_df.merge(weights_df, on='area')
+    shap_df = shap_df.merge(area_mean_df, on='area')
     return shap_df
+
+def weighted_average(df, value, weight):
+    val = df[value]
+    wt = df[weight]
+    return (val * wt).sum() / wt.sum()
+
+def get_weighted_network_average(shap_df, value='mean area shap', weight='area weight'):
+    weighted_avg = shap_df.groupby('network').apply(weighted_average, value, weight)
+    weighted_avg_df = pd.DataFrame({'network': weighted_avg.index, 'shap weighted mean': weighted_avg.values})
+    area_order = ['Vis','SomMot','DorsAttn','SalVentAttn','Limbic','Cont','Default']
+    placeholder_df = pd.DataFrame(area_order, columns=['network'])
+    weighted_avg_df = placeholder_df.merge(weighted_avg_df, on='network')
+    return weighted_avg_df
 
 def collect_predictions(predictions):
     """
