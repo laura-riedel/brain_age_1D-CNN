@@ -168,4 +168,98 @@ def bag_viz(df, variable_name, plot_type, label_x=None, detrended=True, y_ticks=
     if fig_path:
         plt.savefig(fig_path, bbox_inches='tight')
     fig.show()
-  
+
+# EXPLAINABILITY
+def get_network_mapping():
+    network_mapping = {
+        'Vis': 'visual',
+        'SomMot': 'somatomotor',
+        'DorsAttn': 'dorsal attention',
+        'SalVentAttn': 'salience / ventral attention',
+        'Limbic': 'limbic',
+        'Cont': 'control',
+        'Default': 'default',
+    }
+    return network_mapping
+
+def get_area_mapping():
+    area_mapping = {
+        'Post': 'posterior',
+        'PrCv': 'precentral ventral',
+        'FEF': 'frontal eye fields',
+        'ParOper': 'parietal operculum',
+        'FrOperIns': 'frontal operculum insula',
+        'PFCl': 'prefrontal cortex',
+        'PFCl SalVentAttn': 'prefrontal cortex',
+        'PFCl Cont': 'prefrontal cortex',
+        'Med': 'medial',
+        'OFC': 'orbitofrontal cortex',
+        'TempPole': 'temporal pole',
+        'Par': 'parietal',
+        'Par Cont': 'parietal',
+        'Par Default': 'parietal',
+        'pCun': 'precuneus',
+        'Cing': 'cingulate',
+        'Temp': 'temporal',
+        'PFC': 'prefrontal cortex',
+        'pCunPCC': 'precuneus posterior cingulate cortex',
+        'TempOccPar': 'temporal occipital parietal',
+        'PFCmp': 'prefrontal cortex',
+        'PFCv': 'prefrontal cortex',
+        'PFCdPFCm': 'prefrontal cortex',
+    }
+    return area_mapping
+
+def get_colour_map(map_type='network'):
+    """
+    Load dictionary with specific colour style.
+    Input:
+        map_type: either 'network' or 'area'.
+    Output:
+        colour_map: colour map dictionary mappying either networks or areas to colours.
+    """
+    if map_type == 'network':
+        colour_map = {
+            'Vis': '#E7FFA6',
+            'SomMot': '#FFE7A6',
+            'DorsAttn': '#FFA6BE',
+            'SalVentAttn': '#DEA6FF',
+            'Limbic': '#A6BBFF',
+            'Cont': '#A6FFFE',
+            'Default': '#A6FFB2',
+        }
+    elif map_type == 'area':
+        colour_map = {
+            # visual
+            'full Vis': '#E7FFA6',
+            # somatomotor
+            'full SomMot': '#FFE7A6',
+            # salience / ventral attention
+            'Post': '#FFA6BE',
+            'PrCv': '#E57E9A',
+            'FEF': '#CC5C7A',
+            'ParOper': '#DEA6FF',
+            'TempOccPar': '#C07EE5',
+            'FrOperIns': '#A35CCC',
+            'PFCl SalVentAttn': '#883EB3',
+            'Med': '#6F2699',
+            # limbic
+            'OFC': '#A6BBFF',
+            'TempPole': '#7E96E5',
+            # control
+            'Par Cont': '#A6FFFE',
+            'PFCl Cont': '#7EE5E4',
+            'pCun': '#5CCCCA',
+            'Cing': '#3EB3B1',
+            'PFCmp': '#7EE5E4',
+            # default        
+            'Temp': '#A6FFB2',
+            'Par Default': '#7EE58C',
+            'PFC': '#5CCC6B',
+            'pCunPCC': '#3EB34E',
+            'PFCv': '#5CCC6B',
+            'PFCdPFCm': '#5CCC6B',
+        }
+    else:
+        raise NameError('map_type must be "network" or "area". Check for spelling errors!')
+    return colour_map
