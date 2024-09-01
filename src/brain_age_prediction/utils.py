@@ -6,6 +6,7 @@ from typing import Optional
 import yaml
 import pandas as pd
 import numpy as np
+import h5py
 
 from sklearn.linear_model import LinearRegression
 from sklearn.utils import resample
@@ -427,7 +428,7 @@ def merge_metadata_with_splitinfos(ukbb_data_path, path_to_data_info, heldout_pa
     meta_df = data_overview.merge(meta_df, on='eid', how='left')
     return meta_df
 
-def get_schaefer_overview(schaefer_data_dir='../../data/schaefer/', 
+def get_schaefer_overview(schaefer_data_dir='../../data/schaefer/',
                           variants=['7n100p','7n200p','7n500p','7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p']):
     """
     Collect all information about the availability of subject data in one dataframe.
@@ -453,7 +454,7 @@ def get_schaefer_overview(schaefer_data_dir='../../data/schaefer/',
     schaefer_exists_df.rename(columns=rename_dict, inplace=True)
     return schaefer_exists_df
 
-def get_usable_schaefer_ids(schaefer_data_dir='../../data/schaefer/', 
+def get_usable_schaefer_ids(schaefer_data_dir='../../data/schaefer/',
                             variants=['7n100p','7n200p','7n500p','7n700p','7n1000p','17n100p','17n200p','17n500p','17n700p','17n1000p']):
     """
     Get those subject IDs for which we have usable Schaefer variant files.
@@ -540,6 +541,37 @@ def get_network_names(network_names_path='../../data/schaefer/7n100p/label_names
     brain_areas = [strip_network_names(brain_areas[i], remove_nr=remove_nr, remove_hemisphere=remove_hemisphere)
                    for i in range(len(brain_areas))]
     return brain_areas
+
+def get_sub_shap(shap_values, sub_id,
+                 dataloader_order_path='../../data/schaefer/heldout_test_set_100-500p_dataloader_order_43.csv'):
+    """
+    Load SHAP values of a specific subject from the full overview.
+    Input:
+        shap_values: full SHAP value overview array (from deep or shallow model).
+        sub_id: subject ID (int).
+        dataloader_order_path: path to csv which maps subject IDs to SHAP indices.
+    Output:
+        sub_shap: array containing the SHAP values of a specific subject (shape (100,490)).
+    """
+    order = np.loadtxt(dataloader_order_path, dtype=int)
+    idx = np.where(order==sub_id)[0][0]
+    return shap_values[idx]
+
+def get_sub_occlusion(sub_id, model_type, info_type):
+    """
+    Load occlusion info of a specific subject from file.
+    Input:
+        sub_id: subject ID (int).
+        model_type: which 1D-CNN to use. Options: 'deep', 'shallow'.
+        info_type: which info to load. Either 'pred diff', 'occluded preds'
+            or 'occlusion BAG'.
+    Output:
+        sub_info: occlusion info as array.
+    """
+    save_dir = '/ritter/share/projects/laura_riedel_thesis/occlusion_results_'+model_type+'.hdf5'
+    with h5py.File(save_dir, 'r') as f:
+        sub_info = f[str(sub_id)][info_type][()]
+    return sub_info
 
 #### OTHER HELPER FUNCTIONS
 def calculate_bag(df, models=None):
@@ -787,20 +819,20 @@ def extract_area(full_network_str):
             area_name = area_name+' '+network_name
     return area_name
 
-def add_specific_network_columns(df):
+def add_specific_network_columns(df, insert_start=2):
     """
     Insert information columns on a parcellation's hemisphere, network and brain area
     to an existing long-form dataframe.
     Input:
         df: long-form dataframe with at least the following columns: 
-            'id', 'parcellation' (, ...)
+            (...,) 'parcellation' 
     Output:
         df: long-form dataframe with at least the following columns: 
-            'id', 'parcellation', 'hemisphere', 'network', 'area' (, ...)
+            (...,) 'parcellation', 'hemisphere', 'network', 'area' 
     """
-    df.insert(2,'hemisphere',df.apply(lambda row: extract_hemisphere(row['parcellation']), axis=1))
-    df.insert(3,'network',df.apply(lambda row: extract_network(row['parcellation']), axis=1))
-    df.insert(4,'area',df.apply(lambda row: extract_area(row['parcellation']), axis=1))
+    df.insert(insert_start,'hemisphere',df.apply(lambda row: extract_hemisphere(row['parcellation']), axis=1))
+    df.insert(insert_start+1,'network',df.apply(lambda row: extract_network(row['parcellation']), axis=1))
+    df.insert(insert_start+2,'area',df.apply(lambda row: extract_area(row['parcellation']), axis=1))
     return df
 
 def create_long_df(shap_values, sub_shortcut_path='../../data/schaefer/heldout_test_set_100-500p_dataloader_order_43.csv'):
@@ -812,6 +844,7 @@ def create_long_df(shap_values, sub_shortcut_path='../../data/schaefer/heldout_t
             that was used to create the SHAP values.
     Output:
         shap_df: long-form table of mean SHAP values per parcellation per subject.
+        area_mean_df: overview of area means + their weights.
     """
     # load order of subjects
     sub_order = np.loadtxt(sub_shortcut_path, dtype=int)
@@ -827,28 +860,93 @@ def create_long_df(shap_values, sub_shortcut_path='../../data/schaefer/heldout_t
     # add hemisphere + network + area columns
     shap_df = add_specific_network_columns(shap_df)
     # add area mean + area weight column
-    weights_df = pd.DataFrame(columns=['area','area weight'])
-    for network in shap_df['network'].unique():
-        weight = shap_df[shap_df['network'] == network]['area'].value_counts() / len(shap_df[shap_df['network'] == network])
+    shap_df, area_mean_df = calculate_areamean_weights_df(shap_df, 'shap')
+    return shap_df, area_mean_df
+
+def get_occlusion_overview(model_type, occluded_pred=False, 
+                           pred_diff=True, occlusion_bag=False):
+    """
+    Create long-form dataframe overview showing the effect of 
+    channel-wise occlusion on brain age prediction.
+    Input:
+        model_type: which 1D-CNN to use. Options: 'deep', 'shallow'
+        occluded_pred: boolean flag whether to include the specific
+            predictions after channel-wise occlusion. Default: False.
+        pred_diff: boolean flag whether to include the difference between 
+            the original and the occluded model prediction. Default: True.
+        occlusion_bag: boolean flag whether to include the specific
+            brain age gap after channel-wise occlusion. Default: False.
+    Output:
+        occlusion_df: occlusion overview as long-form df
+    """
+    save_dir = '/ritter/share/projects/laura_riedel_thesis/occlusion_results_'+model_type+'.hdf5'
+    # get brain area / network names
+    network_names = get_network_names()
+    # get sub ids
+    sub_ids = np.loadtxt('../../data/schaefer/heldout_test_set_100-500p.csv', dtype=int)
+    # prepare overview df
+    cols = ['eid','parcellation']
+    if occluded_pred:
+        cols += ['occluded pred']
+    if pred_diff:
+        cols += ['pred diff']
+    if occlusion_bag:
+        cols += ['occlusion BAG']
+    occlusion_df = pd.DataFrame(columns=cols)
+    # retrieve info for each subject
+    for sub in sub_ids:
+        results_df = pd.DataFrame(columns=cols)
+        with h5py.File(save_dir, 'r') as f:
+            if occluded_pred:
+                occluded_preds= f[str(sub)]['occluded preds'][()]
+            if occlusion_bag:
+                occlusion_bags = f[str(sub)]['occlusion BAG'][()]
+            if pred_diff:
+                preds_diffs = f[str(sub)]['pred diff'][()]
+        results_df['parcellation'] = network_names
+        results_df['eid'] = sub
+        if occluded_pred:
+            results_df['occluded pred'] = occluded_preds
+        if pred_diff:
+            results_df['pred diff'] = preds_diffs
+        if occlusion_bag:
+            results_df['occlusion BAG'] = occlusion_bags
+        occlusion_df = pd.concat([occlusion_df, results_df], ignore_index=True)
+    # add network / area columns
+    occlusion_df = add_specific_network_columns(occlusion_df)
+    return occlusion_df
+
+def calculate_areamean_weights_df(df, relevant_column):
+    """
+    Calculate the area mean and the area weights for a given dataframe.
+    Input:
+        df: dataframe of interest. Needs at least the columns 'network', 'area',
+            and a column to calculate the mean for (-> relevant column).
+        relevant_column: column name (str) of the column to calculate the mean for.
+    """
+    weights_df = pd.DataFrame(columns=['network','area','area weight'])
+    for network in df['network'].unique():
+        weight = df[df['network'] == network]['area'].value_counts() / len(df[df['network'] == network])
         df_dict = {
+            'network': network,
             'area': weight.index, 
             'area weight': weight.values
         }
         weights_df = pd.concat([weights_df, pd.DataFrame(df_dict)], ignore_index=True)
-    area_mean = shap_df.groupby('area')['shap'].mean()
-    area_mean_df = pd.DataFrame({'area': area_mean.index, 'mean area shap': area_mean.values})
-    area_mean_df = area_mean_df.merge(weights_df, on='area')
-    shap_df = shap_df.merge(area_mean_df, on='area')
-    return shap_df
+    area_mean = df.groupby('area')[relevant_column].mean()
+    area_mean_df = pd.DataFrame({'area': area_mean.index, 'mean area '+relevant_column: area_mean.values})
+    area_mean_df = weights_df.merge(area_mean_df, on='area')
+    df = df.merge(area_mean_df, on=['area','network'], how='left')
+    return df, area_mean_df
 
 def weighted_average(df, value, weight):
     val = df[value]
     wt = df[weight]
     return (val * wt).sum() / wt.sum()
 
-def get_weighted_network_average(shap_df, value='mean area shap', weight='area weight'):
-    weighted_avg = shap_df.groupby('network').apply(weighted_average, value, weight)
-    weighted_avg_df = pd.DataFrame({'network': weighted_avg.index, 'shap weighted mean': weighted_avg.values})
+def get_weighted_network_average(df, value='mean area shap', weight='area weight'):
+    weighted_avg = df.groupby('network').apply(weighted_average, value, weight)
+    weighted_avg_df = pd.DataFrame({'network': weighted_avg.index, 'weighted mean': weighted_avg.values})
     area_order = ['Vis','SomMot','DorsAttn','SalVentAttn','Limbic','Cont','Default']
     placeholder_df = pd.DataFrame(area_order, columns=['network'])
     weighted_avg_df = placeholder_df.merge(weighted_avg_df, on='network')
