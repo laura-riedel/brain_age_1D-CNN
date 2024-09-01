@@ -3,6 +3,8 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 
+from brain_age_prediction import utils
+
 #### VISUALISATIONS
 # TRAINING 
 def plot_training(data, yscale='log', title='', xmin=None, xmax=None):
@@ -263,3 +265,59 @@ def get_colour_map(map_type='network'):
     else:
         raise NameError('map_type must be "network" or "area". Check for spelling errors!')
     return colour_map
+
+def simple_local_explanation(sub_array, kind, explanation='shap',
+                             column='mean SHAP'):
+    """
+    Create simple overview of 20 highest ranking attributions for
+    a specific subject, either on a time- or brain-area-domain.
+    Input:
+        sub_array: array of SHAP values for one subject.
+        kind: attribution kind -- 'timepoint' or 'parcellation'.
+        explanation: which explanation type is used -- 'shap' or 'occlusion'.
+        column: name of column of interest. Default: 'mean SHAP'.
+    Output:
+        visualisation
+    """
+    if kind == 'parcellation':
+        network_names = utils.get_network_names()
+        # load colour maps
+        network_colour_map = get_colour_map('network')
+        sub_df = pd.DataFrame(network_names, columns=['parcellation'])
+        sub_df = utils.add_specific_network_columns(sub_df, insert_start=1)
+        if explanation == 'shap':
+            sub_df[column] = np.mean(np.abs(sub_array),axis=1)
+        elif explanation == 'occlusion':
+            sub_df[column] = np.abs(sub_array)
+        hue = 'network'
+        palette = network_colour_map
+        ylabel = 'brain area / network name'
+    if kind == 'timepoint':
+        # sub_df = pd.DataFrame([str(i) for i in range(1,491)], columns=['timepoint'])
+        sub_df = pd.DataFrame(list(range(1,491)), columns=['timepoint'])
+        if explanation == 'shap':
+            sub_df[column] = np.mean(np.abs(sub_array),axis=0)
+        elif explanation == 'occlusion':
+            raise TypeError('Occlusion does not have timepoint values.')
+        hue = None
+        palette = None
+        ylabel = 'timepoint'
+    # 20 highest mean SHAP values
+    subset = sub_df.sort_values(by=[column], ascending=False)[:20].copy()
+    fig, ax = plt.subplots(figsize=(7,7))
+    sns.barplot(data=subset,
+                x=column,
+                y=kind,
+                orient='h',
+                hue=hue,
+                palette=palette,
+                dodge=False,
+                ax=ax)
+    if explanation == 'shap':
+        xlabel = 'mean(|SHAP value|) (mean impact on model output magnitude)'
+    elif explanation == 'occlusion':
+        xlabel = f'|occlusion value| (impact on {column} in years)'
+    ax.set(xlabel=xlabel,
+        ylabel=ylabel,
+        title='20 highest ranking attributions')
+    plt.show()
