@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+from pingouin import partial_corr
 
 from brain_age_prediction import utils
 
@@ -34,7 +35,7 @@ def get_plot_values(df):
     return xmin, xmax, xstep, xrange
 
 # BAGs
-def preds_corr_overview(df, variables=True, models=None):
+def preds_corr_overview(df, variables=True, models=None, covariates=None):
     """
     Calculate correlations between all aspects of interest.
     Expects an overview dataframe that is limited to those IDs for which
@@ -50,6 +51,9 @@ def preds_corr_overview(df, variables=True, models=None):
                 and "bag_modelname_detrended" columns. If None, single 
                 "bag"/"bag_detrended" columns are expected for which to 
                 calculate correlations.
+        covariates: list of variable names which to consider as covariates
+                for partial correlation. If none, no partial corelation is
+                performed but simple Spearman's rank correlation.
     Output:
         correlations_df: correlation overview dataframe.
     """
@@ -57,6 +61,8 @@ def preds_corr_overview(df, variables=True, models=None):
                    'grip', 'depressive episode', 'all depression',
                    'recurrent depressive disorder', 'multiple sclerosis', 'sex',
                    'weekly beer', 'genetic pc 1', 'genetic pc 2', 'genetic pc 3']
+    if covariates:
+        var_columns = [var for var in var_columns if var not in covariates]
     bag = 'bag_'
     connector = '_'
     if not models:
@@ -69,30 +75,44 @@ def preds_corr_overview(df, variables=True, models=None):
         for column in var_columns:
             for model in models:
                 correlations_df.loc[idx,'Variable'] = column
-                correlations_df.loc[idx,'Corr BAG '+model+' model'] = df[bag+model].corr(df[column], method='spearman')
-                correlations_df.loc[idx,'Corr detrended BAG '+model+' model'] = df[bag+model+'_detrended'].corr(df[column], method='spearman')
+                if covariates:
+                    partial_correlation = partial_corr(df, x=bag+model, y=column, covar=covariates, method='spearman')
+                    correlations_df.loc[idx,'Corr BAG '+model+' model'] = partial_correlation.loc['spearman','r']
+                    correlations_df.loc[idx,'CI95 BAG '+model+' model'] = str(partial_correlation.loc['spearman','CI95%'])
+                    correlations_df.loc[idx,'p-val BAG '+model+' model'] = partial_correlation.loc['spearman','p-val']
+                else:
+                    correlations_df.loc[idx,'Corr BAG '+model+' model'] = df[bag+model].corr(df[column], method='spearman')
+                    correlations_df.loc[idx,'Corr detrended BAG '+model+' model'] = df[bag+model+'_detrended'].corr(df[column], method='spearman')
             idx += 1
+        return correlations_df
     else:
-        rows = []
-        corr_cols = []
-        for model in models:
-            rows.append(f'Predicted age {model} model')
-            rows.append(f'BAG {model} model')
-            rows.append(f'Detrended BAG {model} model')
-            corr_cols.append(f'predicted_age{connector}{model}')
-            corr_cols.append(f'bag{connector}{model}')
-            corr_cols.append(f'bag{connector}{model}_detrended')
-        correlations_df = pd.DataFrame(columns=['True age vs.','Corr'])
-        for idx in range(len(rows)):
-            correlations_df.loc[idx,'True age vs.'] = rows[idx]
-            correlations_df.loc[idx,'Corr'] = df['age'].corr(df[corr_cols[idx]], method='spearman')
-    return correlations_df
+        if covariates:
+            return 'x variable and covariates must be independent; can\'t investigate relationship to true age.'
+        else:
+            rows = []
+            corr_cols = []
+            for model in models:
+                rows.append(f'Predicted age {model} model')
+                rows.append(f'BAG {model} model')
+                if not covariates:
+                    rows.append(f'Detrended BAG {model} model')
+                corr_cols.append(f'predicted_age{connector}{model}')
+                corr_cols.append(f'bag{connector}{model}')
+                if not covariates:
+                    corr_cols.append(f'bag{connector}{model}_detrended')
+            correlations_df = pd.DataFrame(columns=['True age vs.','Corr'])
+            for idx in range(len(rows)):
+                correlations_df.loc[idx,'True age vs.'] = rows[idx]
+                correlations_df.loc[idx,'Corr'] = df['age'].corr(df[corr_cols[idx]], method='spearman')
+            return correlations_df
 
-def bootstrap_overview(corrs_dict, variables=True, model=None):
+def bootstrap_overview(corrs_dict, variables=True, model=None, covariates=None):
     var_columns = ['bmi', 'digit substitution', 'education', 'fluid intelligence',
                    'grip', 'depressive episode', 'all depression',
                    'recurrent depressive disorder', 'multiple sclerosis', 'sex',
                    'weekly beer', 'genetic pc 1', 'genetic pc 2', 'genetic pc 3']
+    if covariates:
+        var_columns = [var for var in var_columns if var not in covariates]
     connector = '_'
     if not model:
         model = ''
@@ -103,22 +123,26 @@ def bootstrap_overview(corrs_dict, variables=True, model=None):
             correlations_df.loc[idx,'Variable'] = var_columns[idx]
             correlations_df.loc[idx,'Corr BAG '+model+' model mean'] = corrs_dict['corrs variables']['mean'][idx]
             correlations_df.loc[idx,'Corr BAG '+model+' model sem'] = corrs_dict['corrs variables']['std'][idx]
-            correlations_df.loc[idx,'Corr detrended BAG '+model+' model mean'] = corrs_dict['corrs variables detrended']['mean'][idx]
-            correlations_df.loc[idx,'Corr detrended BAG '+model+' model sem'] = corrs_dict['corrs variables detrended']['std'][idx]
+            if not covariates:
+                correlations_df.loc[idx,'Corr detrended BAG '+model+' model mean'] = corrs_dict['corrs variables detrended']['mean'][idx]
+                correlations_df.loc[idx,'Corr detrended BAG '+model+' model sem'] = corrs_dict['corrs variables detrended']['std'][idx]
     else:
-        rows = []
-        corr_cols = []
-        rows.append(f'Predicted age {model} model')
-        rows.append(f'BAG {model} model')
-        rows.append(f'Detrended BAG {model} model')
-        corr_cols.append(f'predicted_age{connector}{model}')
-        corr_cols.append(f'bag{connector}{model}')
-        corr_cols.append(f'bag{connector}{model}_detrended')
-        correlations_df = pd.DataFrame(columns=['True age vs.','Corr mean','Corr sem'])
-        for idx in range(len(rows)):
-            correlations_df.loc[idx,'True age vs.'] = rows[idx]
-            correlations_df.loc[idx,'Corr mean'] = corrs_dict['corrs true age']['mean'][idx]
-            correlations_df.loc[idx,'Corr sem'] = corrs_dict['corrs true age']['std'][idx]
+        if covariates:
+            return 'x variable and covariates must be independent; can\'t investigate relationship to true age.'
+        else:
+            rows = []
+            corr_cols = []
+            rows.append(f'Predicted age {model} model')
+            rows.append(f'BAG {model} model')
+            rows.append(f'Detrended BAG {model} model')
+            corr_cols.append(f'predicted_age{connector}{model}')
+            corr_cols.append(f'bag{connector}{model}')
+            corr_cols.append(f'bag{connector}{model}_detrended')
+            correlations_df = pd.DataFrame(columns=['True age vs.','Corr mean','Corr sem'])
+            for idx in range(len(rows)):
+                correlations_df.loc[idx,'True age vs.'] = rows[idx]
+                correlations_df.loc[idx,'Corr mean'] = corrs_dict['corrs true age']['mean'][idx]
+                correlations_df.loc[idx,'Corr sem'] = corrs_dict['corrs true age']['std'][idx]
     return correlations_df
 
 def bag_viz(df, variable_name, plot_type, label_x=None, detrended=True, y_ticks=[-25,-20,-15,-10,-5,0,5,10,15,20,25], fig_path=None):

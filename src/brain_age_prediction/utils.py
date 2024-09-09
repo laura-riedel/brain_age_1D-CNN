@@ -10,6 +10,7 @@ import h5py
 
 from sklearn.linear_model import LinearRegression
 from sklearn.utils import resample
+from pingouin import partial_corr
 
 # Pytorch etc
 import torch
@@ -622,7 +623,7 @@ def detrend_bag(df, models=None):
             df.loc[:,'bag_'+model_name+'_detrended'] = y-trend
     return df
 
-def preds_corr(df, column=None, model_name=None, variables=True):
+def preds_corr(df, column=None, model_name=None, variables=True, covariates=None):
     """
     Calculate correlations between all aspects of interest.
     Expects an overview dataframe that is limited to those IDs for which
@@ -650,24 +651,34 @@ def preds_corr(df, column=None, model_name=None, variables=True):
                    'grip', 'depressive episode', 'all depression',
                    'recurrent depressive disorder', 'multiple sclerosis', 'sex',
                    'weekly beer', 'genetic pc 1', 'genetic pc 2', 'genetic pc 3']
+    if covariates:
+        var_columns = [var for var in var_columns if var not in covariates]
     corrs = []
     if variables:
         for var_column in var_columns:
-            corrs.append(df[column].corr(df[var_column], method='spearman'))
+            if covariates:
+                partial_correlation = partial_corr(df, x=column, y=var_column, covar=covariates, method='spearman')
+                corrs.append(partial_correlation.loc['spearman','r'])
+            else:
+                corrs.append(df[column].corr(df[var_column], method='spearman'))
+        return corrs
     else:
-        columns = []
-        if model_name:
-            columns.append(f'predicted_age_{model_name}')
-            columns.append(f'bag_{model_name}')
-            columns.append(f'bag_{model_name}_detrended')
-            model_name = '_'+model_name
+        if covariates:
+            return 'x variable and covariates must be independent; can\'t investigate relationship to true age.'
         else:
-            columns = ['predicted_age', 'bag', 'bag_detrended']
-        for var_column in columns:
-            corrs.append(df['age'].corr(df[var_column], method='spearman'))
-    return corrs
+            columns = []
+            if model_name:
+                columns.append(f'predicted_age_{model_name}')
+                columns.append(f'bag_{model_name}')
+                columns.append(f'bag_{model_name}_detrended')
+                model_name = '_'+model_name
+            else:
+                columns = ['predicted_age', 'bag', 'bag_detrended']
+            for var_column in columns:
+                corrs.append(df['age'].corr(df[var_column], method='spearman'))
+            return corrs
 
-def bootstrap_corrs(df, model_name=None, n_iterations=10):
+def bootstrap_corrs(df, model_name=None, n_iterations=10, covariates=None):
     """
     Bootstrap prediction overviews for one model.
     Input:
@@ -689,66 +700,88 @@ def bootstrap_corrs(df, model_name=None, n_iterations=10):
     corrs_vars_detrended = []
     for i in range(n_iterations):
         bootstrapped_df = resample(df, replace=True, random_state=i)
-        corrs_true_age.append(preds_corr(bootstrapped_df,model_name=model_name,variables=False))
-        corrs_vars.append(preds_corr(bootstrapped_df,column=bag+model_name,variables=True))
-        corrs_vars_detrended.append(preds_corr(bootstrapped_df,column=bag+model_name+'_detrended',variables=True))
-    corrs_dict = {
-        'corrs true age': {'mean': np.mean(corrs_true_age, axis=0),
-                           'std': np.std(corrs_true_age, axis=0)},
-        'corrs variables': {'mean': np.mean(corrs_vars, axis=0),
-                            'std': np.std(corrs_vars, axis=0)},
-        'corrs variables detrended': { 'mean': np.mean(corrs_vars_detrended, axis=0),
-                                      'std': np.std(corrs_vars_detrended, axis=0)}
-    }
+        corrs_vars.append(preds_corr(bootstrapped_df,column=bag+model_name,variables=True,covariates=covariates))
+        if not covariates:
+            corrs_true_age.append(preds_corr(bootstrapped_df,model_name=model_name,variables=False))
+            corrs_vars_detrended.append(preds_corr(bootstrapped_df,column=bag+model_name+'_detrended',variables=True))
+    corrs_dict = {'corrs variables': {'mean': np.mean(corrs_vars, axis=0),
+                                      'std': np.std(corrs_vars, axis=0)}}
+    if not covariates:
+        corrs_dict['corrs true age'] = {'mean': np.mean(corrs_true_age, axis=0),
+                                        'std': np.std(corrs_true_age, axis=0)}
+        corrs_dict['corrs variables detrended'] =  {'mean': np.mean(corrs_vars_detrended, axis=0),
+                                                    'std': np.std(corrs_vars_detrended, axis=0)}
     return corrs_dict
 
-def bootstrap_pipeline(df, models=None, n_iterations=10):
+def bootstrap_pipeline(df, models=None, n_iterations=10, covariates=None):
     """
     """
     if not models:
         models = ['']
     
     # get overviews for first model
-    corrs_true_age_df, corrs_vars_df = get_model_bootstrap_overview(df=df,
-                                                                    model_name=models[0],
-                                                                    n_iterations=n_iterations)
+    if covariates:
+        corrs_vars_df = get_model_bootstrap_overview(df=df,
+                                                     model_name=models[0],
+                                                     n_iterations=n_iterations,
+                                                     covariates=covariates)
+    else:
+        corrs_true_age_df, corrs_vars_df = get_model_bootstrap_overview(df=df,
+                                                                        model_name=models[0],
+                                                                        n_iterations=n_iterations)
     # optional further models
     if len(models) > 1:
         for model_idx in range(1, len(models)):
-            new_corrs_true_age_df, new_corrs_vars_df = get_model_bootstrap_overview(df=df,
-                                                                                    model_name=models[model_idx],
-                                                                                    n_iterations=n_iterations)
+            if covariates:
+                new_corrs_vars_df = get_model_bootstrap_overview(df=df,
+                                                                 model_name=models[model_idx],
+                                                                 n_iterations=n_iterations,
+                                                                 covariates=covariates)
+            else:    
+                new_corrs_true_age_df, new_corrs_vars_df = get_model_bootstrap_overview(df=df,
+                                                                                        model_name=models[model_idx],
+                                                                                        n_iterations=n_iterations)
             # merge with previous overview
-            corrs_true_age_df = pd.concat([corrs_true_age_df,new_corrs_true_age_df], ignore_index=True)
+                corrs_true_age_df = pd.concat([corrs_true_age_df,new_corrs_true_age_df], ignore_index=True)
             corrs_vars_df = corrs_vars_df.merge(new_corrs_vars_df, on='Variable')
+    if covariates:
+        return corrs_vars_df
     return corrs_true_age_df, corrs_vars_df
     
-def get_model_bootstrap_overview(df, model_name, n_iterations):
+def get_model_bootstrap_overview(df, model_name, n_iterations, covariates=None):
     """
     Create overviews over true age + variable correlations for one model,
     displaying the data's 'raw' correlations as well as 
     the bootstrap mean + SEM, and the zscore.
     """
     # heldout corrs
-    corrs_true_age_df = viz.preds_corr_overview(df, variables=False, models=[model_name])
-    corrs_vars_df = viz.preds_corr_overview(df, variables=True, models=[model_name])
+    if not covariates:
+        corrs_true_age_df = viz.preds_corr_overview(df, variables=False, models=[model_name])
+    corrs_vars_df = viz.preds_corr_overview(df, variables=True, models=[model_name], covariates=covariates)
     # bootstrapped corrs
-    corrs_bs_dict = bootstrap_corrs(df=df, model_name=model_name, n_iterations=n_iterations)
-    corrs_true_age_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=False, model=model_name)
-    corrs_vars_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=True, model=model_name)
+    corrs_bs_dict = bootstrap_corrs(df=df, model_name=model_name, n_iterations=n_iterations, covariates=covariates)
+    if not covariates:
+        corrs_true_age_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=False, model=model_name)
+        # merge
+        corrs_true_age_df = corrs_true_age_df.merge(corrs_true_age_bs_df, on='True age vs.')
+        # calculate zscore
+        corrs_true_age_df['Corr z'] = corrs_true_age_df['Corr mean'] / corrs_true_age_df['Corr sem']
+    corrs_vars_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=True, model=model_name, covariates=covariates)
     # merge
-    corrs_true_age_df = corrs_true_age_df.merge(corrs_true_age_bs_df, on='True age vs.')
     corrs_vars_df = corrs_vars_df.merge(corrs_vars_bs_df, on='Variable')
-    # calculate zscore
-    corrs_true_age_df['Corr z'] = corrs_true_age_df['Corr mean'] / corrs_true_age_df['Corr sem']
+    # calculate z-score
     corrs_vars_df['Corr BAG '+model_name+' z'] = corrs_vars_df['Corr BAG '+model_name+' model mean'] / corrs_vars_df['Corr BAG '+model_name+' model sem']
-    corrs_vars_df['Corr detrended BAG '+model_name+' z'] = corrs_vars_df['Corr detrended BAG '+model_name+' model mean'] / corrs_vars_df['Corr detrended BAG '+model_name+' model sem']
+    if not covariates:
+        corrs_vars_df['Corr detrended BAG '+model_name+' z'] = corrs_vars_df['Corr detrended BAG '+model_name+' model mean'] / corrs_vars_df['Corr detrended BAG '+model_name+' model sem']
     # reorder colums
     cols = ['Variable','Corr BAG '+model_name+' model', 'Corr BAG '+model_name+' model mean',
-            'Corr BAG '+model_name+' model sem', 'Corr BAG '+model_name+' z',
-            'Corr detrended BAG '+model_name+' model', 'Corr detrended BAG '+model_name+' model mean', 
-            'Corr detrended BAG '+model_name+' model sem', 'Corr detrended BAG '+model_name+' z']
+            'Corr BAG '+model_name+' model sem', 'Corr BAG '+model_name+' z']
+    if not covariates:
+        cols += ['Corr detrended BAG '+model_name+' model', 'Corr detrended BAG '+model_name+' model mean',
+                 'Corr detrended BAG '+model_name+' model sem', 'Corr detrended BAG '+model_name+' z']
     corrs_vars_df = corrs_vars_df.reindex(columns=cols)
+    if covariates:
+        return corrs_vars_df
     return corrs_true_age_df, corrs_vars_df
 
 def strip_network_names(name, remove_nr=True, remove_hemisphere=False):
