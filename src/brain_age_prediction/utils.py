@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import h5py
 
+import scipy
 from sklearn.linear_model import LinearRegression
 from sklearn.utils import resample
 from pingouin import partial_corr
@@ -764,21 +765,25 @@ def get_model_bootstrap_overview(df, model_name, n_iterations, covariates=None):
         corrs_true_age_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=False, model=model_name)
         # merge
         corrs_true_age_df = corrs_true_age_df.merge(corrs_true_age_bs_df, on='True age vs.')
-        # calculate zscore
+        # calculate zscore + p-value
         corrs_true_age_df['Corr z'] = corrs_true_age_df['Corr mean'] / corrs_true_age_df['Corr sem']
+        corrs_true_age_df['Corr p'] = [scipy.stats.norm.sf(abs(corrs_true_age_df['Corr z'][i]))*2 for i in range(len(corrs_true_age_df))]
     corrs_vars_bs_df = viz.bootstrap_overview(corrs_bs_dict, variables=True, model=model_name, covariates=covariates)
     # merge
     corrs_vars_df = corrs_vars_df.merge(corrs_vars_bs_df, on='Variable')
-    # calculate z-score
+    # calculate z-score + p-value
     corrs_vars_df['Corr BAG '+model_name+' z'] = corrs_vars_df['Corr BAG '+model_name+' model mean'] / corrs_vars_df['Corr BAG '+model_name+' model sem']
+    corrs_vars_df['Corr BAG '+model_name+' p'] = scipy.stats.norm.sf(abs(np.asarray(corrs_vars_df['Corr BAG '+model_name+' z'])))*2
     if not covariates:
         corrs_vars_df['Corr detrended BAG '+model_name+' z'] = corrs_vars_df['Corr detrended BAG '+model_name+' model mean'] / corrs_vars_df['Corr detrended BAG '+model_name+' model sem']
+        corrs_vars_df['Corr detrended BAG '+model_name+' p'] = scipy.stats.norm.sf(abs(np.asarray(corrs_vars_df['Corr detrended BAG '+model_name+' z'])))*2
     # reorder colums
     cols = ['Variable','Corr BAG '+model_name+' model', 'Corr BAG '+model_name+' model mean',
-            'Corr BAG '+model_name+' model sem', 'Corr BAG '+model_name+' z']
+            'Corr BAG '+model_name+' model sem', 'Corr BAG '+model_name+' z', 'Corr BAG '+model_name+' p']
     if not covariates:
         cols += ['Corr detrended BAG '+model_name+' model', 'Corr detrended BAG '+model_name+' model mean',
-                 'Corr detrended BAG '+model_name+' model sem', 'Corr detrended BAG '+model_name+' z']
+                 'Corr detrended BAG '+model_name+' model sem', 'Corr detrended BAG '+model_name+' z',
+                 'Corr detrended BAG '+model_name+' p']
     corrs_vars_df = corrs_vars_df.reindex(columns=cols)
     if covariates:
         return corrs_vars_df
