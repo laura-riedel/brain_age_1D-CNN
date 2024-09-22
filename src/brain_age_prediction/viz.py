@@ -3,6 +3,7 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 from pingouin import partial_corr
+from scipy.stats import zscore
 
 from brain_age_prediction import utils
 
@@ -186,7 +187,7 @@ def bag_viz(df, variable_name, plot_type, label_x=None, detrended=True, y_ticks=
     for ax in axes:
         ax.axhline(y=0, color='#7f7f7f', linestyle='--', zorder=0)
         ax.set(ylabel='Brain age gap',
-            yticks=y_ticks, 
+            yticks=y_ticks,
             xlabel=label_x,
             )
     axes[0].set(title='Original model')
@@ -291,7 +292,7 @@ def get_colour_map(map_type='network'):
     return colour_map
 
 def simple_local_explanation(sub_array, kind, explanation='shap',
-                             column='mean SHAP'):
+                             column='mean SHAP', abs=True):
     """
     Create simple overview of 20 highest ranking attributions for
     a specific subject, either on a time- or brain-area-domain.
@@ -310,9 +311,15 @@ def simple_local_explanation(sub_array, kind, explanation='shap',
         sub_df = pd.DataFrame(network_names, columns=['parcellation'])
         sub_df = utils.add_specific_network_columns(sub_df, insert_start=1)
         if explanation == 'shap':
-            sub_df[column] = np.mean(np.abs(sub_array),axis=1)
+            if abs:
+                sub_df[column] = np.mean(np.abs(sub_array),axis=1)
+            else:
+                sub_df[column] = np.mean(sub_array,axis=1)
         elif explanation == 'occlusion':
-            sub_df[column] = np.abs(sub_array)
+            if abs:
+                sub_df[column] = np.abs(sub_array)
+            else:
+                sub_df[column] = sub_array
         hue = 'network'
         palette = network_colour_map
         ylabel = 'brain area / network name'
@@ -320,28 +327,187 @@ def simple_local_explanation(sub_array, kind, explanation='shap',
         # sub_df = pd.DataFrame([str(i) for i in range(1,491)], columns=['timepoint'])
         sub_df = pd.DataFrame(list(range(1,491)), columns=['timepoint'])
         if explanation == 'shap':
-            sub_df[column] = np.mean(np.abs(sub_array),axis=0)
+            if abs:
+                sub_df[column] = np.mean(np.abs(sub_array),axis=0)
+            else:
+                sub_df[column] = np.mean(sub_array,axis=0)
         elif explanation == 'occlusion':
             raise TypeError('Occlusion does not have timepoint values.')
         hue = None
         palette = None
         ylabel = 'timepoint'
     # 20 highest mean SHAP values
-    subset = sub_df.sort_values(by=[column], ascending=False)[:20].copy()
-    fig, ax = plt.subplots(figsize=(7,7))
-    sns.barplot(data=subset,
+    ranking_order_idx = sub_df[column].abs().sort_values(ascending=False).index.values
+    ranking_order_parcels = [sub_df.loc[i,kind] for i in ranking_order_idx]
+    fig, ax = plt.subplots(figsize=(8,7))
+    sns.barplot(data=sub_df,
                 x=column,
                 y=kind,
                 orient='h',
                 hue=hue,
                 palette=palette,
                 dodge=False,
+                order=ranking_order_parcels[:20],
                 ax=ax)
     if explanation == 'shap':
         xlabel = 'mean(|SHAP value|) (mean impact on model output magnitude)'
     elif explanation == 'occlusion':
-        xlabel = f'|occlusion value| (impact on {column} in years)'
+        xlabel = f'occlusion value (impact on {column} in years)'
     ax.set(xlabel=xlabel,
         ylabel=ylabel,
         title='20 highest ranking attributions')
-    plt.show()
+    ax.legend(bbox_to_anchor=(1.0, 1.0), loc='upper left')
+    fig.tight_layout()
+    fig.show()
+
+def save_heatmap(shap_data, sub_id, figsize=(20,3), vmin=-12, vmax=10,
+                 normalise=True, save_name=None):
+    data = utils.get_sub_shap(shap_data, sub_id)
+    if normalise:
+        data = zscore(data, axis=1)
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.heatmap(data, cmap="PuOr", center=0, square=True,
+                vmin=vmin, vmax=vmax,
+                ax=ax, xticklabels='auto', yticklabels='auto')
+    if save_name:
+        save_dir = '/home/laurar/brain_age_1D-CNN/viz/'+save_name
+    else:
+        save_dir = '/home/laurar/brain_age_1D-CNN/viz/heatmap'+str(sub_id)+'.png'
+    fig.tight_layout()
+    fig.savefig(save_dir)
+
+def save_parcel_explanation(data, sub_id, xlim=(0,0.014), explanation='shap',
+                           column='mean SHAP', absolute=True,
+                           save_name=None):
+    """
+    Save overview of 20 highest ranking attributions for
+    a specific subject, either on a time- or brain-area-domain.
+    Input:
+        shap_data:
+        sub_id:
+        xlim:
+        explanation: which explanation type is used -- 'shap' or 'occlusion'.
+        column: name of column of interest. Default: 'mean SHAP'.
+        absolute:
+        save_name:
+    Output:
+        visualisation
+    """
+    if explanation=='shap':
+        sub_array = utils.get_sub_shap(data, sub_id)
+    elif explanation=='occlusion':
+        sub_array = data
+    # if kind == 'parcellation':
+    network_names = utils.get_network_names()
+    # load colour maps
+    network_colour_map = get_colour_map('network')
+    sub_df = pd.DataFrame(network_names, columns=['parcellation'])
+    sub_df = utils.add_specific_network_columns(sub_df, insert_start=1)
+    if explanation == 'shap':
+        if absolute:
+            sub_df[column] = np.mean(np.abs(sub_array),axis=1)
+        else:
+            sub_df[column] = np.mean(sub_array,axis=1)
+    elif explanation == 'occlusion':
+        if absolute:
+            sub_df[column] = np.abs(sub_array)
+        else:
+            sub_df[column] = sub_array
+    hue = 'network'
+    palette = network_colour_map
+    ylabel = 'brain area / network name'
+    ranking_order_idx = sub_df[column].abs().sort_values(ascending=False).index.values
+    ranking_order_parcels = [sub_df.loc[i,'parcellation'] for i in ranking_order_idx]
+    # 20 highest mean SHAP values
+    fig, ax = plt.subplots(figsize=(8,5))
+    sns.barplot(data=sub_df,
+                x=column,
+                y='parcellation',
+                orient='h',
+                hue=hue,
+                palette=palette,
+                dodge=False,
+                order=ranking_order_parcels[:20],
+                ax=ax)
+    if explanation == 'shap':
+        if absolute:
+            xlabel = 'mean(|SHAP value|)'
+        else:
+            xlabel = 'mean(SHAP value)'
+    elif explanation == 'occlusion':
+        if absolute:
+            xlabel = '|prediction difference| in years'
+        else:
+            xlabel = 'prediction difference in years'
+    ax.set(xlabel=xlabel,
+           ylabel=ylabel)
+           #xlim=xlim)
+    ax.set_xlim(xlim)
+    ax.legend(bbox_to_anchor=(1.0, 1.0), loc='upper left')
+    if save_name:
+        save_dir = '/home/laurar/brain_age_1D-CNN/viz/'+save_name
+    else:
+        save_dir = '/home/laurar/brain_age_1D-CNN/viz/parcellation_'+explanation+'_'+str(sub_id)+'.png'
+    fig.tight_layout()
+    fig.savefig(save_dir)
+
+def save_timepoint_explanation(shap_data, sub_id, xlim=(0,0.0175), explanation='shap',
+                           column='mean SHAP', absolute=True,
+                           save_name=None):
+    """
+    Save overview of 20 highest ranking attributions for
+    a specific subject, either on a time- or brain-area-domain.
+    Input:
+        shap_data:
+        sub_id:
+        kind: attribution kind -- 'timepoint' or 'parcellation'.
+        xlim:
+        explanation: which explanation type is used -- 'shap' or 'occlusion'.
+        column: name of column of interest. Default: 'mean SHAP'.
+        abs:
+        save_name:
+    Output:
+        visualisation
+    """
+    sub_array = utils.get_sub_shap(shap_data, sub_id)
+    sub_df = pd.DataFrame(list(range(1,491)), columns=['timepoint'])
+    if explanation == 'shap':
+        if absolute:
+            sub_df[column] = np.mean(np.abs(sub_array),axis=0)
+        else:
+            sub_df[column] = np.mean(sub_array,axis=0)
+    elif explanation == 'occlusion':
+        raise TypeError('Occlusion does not have timepoint values.')
+    hue = None
+    palette = None
+    ylabel = 'timepoint'
+    # 20 highest mean SHAP values
+    subset = sub_df.sort_values(by=[column], ascending=False)[:20].copy()
+    fig, ax = plt.subplots(figsize=(5,5))
+    sns.barplot(data=subset,
+                x=column,
+                y='timepoint',
+                orient='h',
+                hue=hue,
+                palette=palette,
+                dodge=False,
+                ax=ax)
+    if explanation == 'shap':
+        if absolute:
+            xlabel = 'mean(|SHAP value|)'
+        else:
+            xlabel = 'mean(SHAP value)'
+    elif explanation == 'occlusion':
+        if absolute:
+            xlabel = f'|occlusion value| (impact on {column} in years)'
+        else:
+            xlabel = f'occlusion value (impact on {column} in years)'
+    ax.set(xlabel=xlabel,
+           ylabel=ylabel,
+           xlim=xlim)
+    if save_name:
+        save_dir = '/home/laurar/brain_age_1D-CNN/viz/'+save_name
+    else:
+        save_dir = '/home/laurar/brain_age_1D-CNN/viz/timepoint_'+explanation+'_'+str(sub_id)+'.png'
+    fig.tight_layout()
+    fig.savefig(save_dir)
