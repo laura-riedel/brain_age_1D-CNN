@@ -974,7 +974,11 @@ def calculate_areamean_weights_df(df, relevant_column):
     area_mean = df.groupby('area')[relevant_column].mean()
     area_mean_df = pd.DataFrame({'area': area_mean.index, 'mean area '+relevant_column: area_mean.values})
     area_mean_df = weights_df.merge(area_mean_df, on='area')
-    df = df.merge(area_mean_df, on=['area','network'], how='left')
+    if 'area weight' in df.columns:
+        merge_on = ['area','network','area weight']
+    else:
+        merge_on = ['area','network']
+    df = df.merge(area_mean_df, on=merge_on, how='left')
     return df, area_mean_df
 
 def weighted_average(df, value, weight):
