@@ -478,9 +478,6 @@ def save_timepoint_explanation(shap_data, sub_id, xlim=(0,0.0175), explanation='
             sub_df[column] = np.mean(sub_array,axis=0)
     elif explanation == 'occlusion':
         raise TypeError('Occlusion does not have timepoint values.')
-    hue = None
-    palette = None
-    ylabel = 'timepoint'
     # 20 highest mean SHAP values
     subset = sub_df.sort_values(by=[column], ascending=False)[:20].copy()
     fig, ax = plt.subplots(figsize=(5,5))
@@ -488,22 +485,15 @@ def save_timepoint_explanation(shap_data, sub_id, xlim=(0,0.0175), explanation='
                 x=column,
                 y='timepoint',
                 orient='h',
-                hue=hue,
-                palette=palette,
-                dodge=False,
+                color='steelblue',
                 ax=ax)
     if explanation == 'shap':
         if absolute:
             xlabel = 'mean(|SHAP value|)'
         else:
             xlabel = 'mean(SHAP value)'
-    elif explanation == 'occlusion':
-        if absolute:
-            xlabel = f'|occlusion value| (impact on {column} in years)'
-        else:
-            xlabel = f'occlusion value (impact on {column} in years)'
     ax.set(xlabel=xlabel,
-           ylabel=ylabel,
+           ylabel='timepoint',
            xlim=xlim)
     if save_name:
         save_dir = '/home/laurar/brain_age_1D-CNN/viz/'+save_name
