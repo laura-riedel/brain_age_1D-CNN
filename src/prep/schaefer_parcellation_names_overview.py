@@ -1,4 +1,11 @@
-# CREATE OVERVIEWS: which networks do the parcellations belong to?
+"""
+Script that creates a overviews of network names:
+For each of the chosen Schaefer variants, it creates an overview 
+which networks the parcellations belong to.
+
+Run e.g. with:
+$ python3 schaefer_parcellation_names_overview.py
+"""
 # import packages
 import pandas as pd
 

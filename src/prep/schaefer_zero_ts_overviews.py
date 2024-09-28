@@ -1,4 +1,10 @@
-# CREATE OVERVIEWS: for each Schaefer variant, which parcellations contain only 0-timeseries, and how often?
+"""
+Script that creates an overview for each Schaefer variant:
+Per variant, which parcellations contain only 0-timeseries, and how often?
+
+Run e.g. with:
+$ python3 schaefer_zero_ts_overview.py
+"""
 # import packages
 import pandas as pd
 from collections import Counter

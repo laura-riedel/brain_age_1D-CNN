@@ -1,6 +1,9 @@
 """
 Iterate through all known UKBB subjects. If they have Schaefer parcellation timeseries,
 calculate the functional connectivity (FC) matrix and save the upper triangle as HDF5 file.
+
+Run e.g. with: 
+$ python 3 create_fc_matrices.py
 """
 
 import numpy as np

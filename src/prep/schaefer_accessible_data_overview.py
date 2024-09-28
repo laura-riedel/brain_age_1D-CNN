@@ -13,6 +13,9 @@ Two overviews are created per Schaefer variant in the specified directory (schae
                         whether they contain NaN values (contains_nan -> Bool) 
                         or only 0's (contains_0 -> Bool) and where (location_of_0 -> List(Int)).
 - `empty_files.csv`: simple collection of the subject IDs containing empty Schaefer files
+
+Run e.g. with:
+$ python3 schaefer_accessible_data_overview.py
 """
 # import packages
 import pandas as pd
