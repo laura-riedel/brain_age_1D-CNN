@@ -1,6 +1,6 @@
 """
-Perform channel-wise occlusion for each subject in the heldout test
-set and calculate the performance difference when predicting subjects'
+Script for performing channel-wise occlusion for each subject in the heldout
+test set and calculate the performance difference when predicting subjects'
 ages with each data permutation using either the deep or shallow 1D-CNN.
 """
 import argparse

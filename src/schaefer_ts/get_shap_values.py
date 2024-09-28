@@ -1,3 +1,9 @@
+"""
+Script for fitting a DeepLiftSHAP explainer on the development test data which
+then generates SHAP values for the specified model on the heldout test set
+and saves those SHAP values for future use.
+"""
+
 import argparse
 import h5py
 import csv
